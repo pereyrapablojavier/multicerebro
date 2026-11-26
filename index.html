@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tablas de multiplicar</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4361ee">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tablas">
 <style>
   :root {
     --bg: #fff8e7; --card: #ffffff; --ink: #2b2d42; --muted: #6c7089;
@@ -85,6 +92,10 @@
     </div>
     <div style="margin-top:16px; text-align:center">
       <button class="secondary" id="btn-report">📊 Ver puntos de la semana</button>
+    </div>
+    <div id="install-box" class="hidden" style="margin-top:16px; text-align:center">
+      <button id="btn-install" class="hidden" style="background:var(--good)">📲 Instalar en el celular</button>
+      <p id="ios-help" class="hint hidden">Para instalarla: tocá el botón <strong>Compartir</strong> <span aria-hidden="true">⬆️</span> de Safari y elegí <strong>“Agregar a pantalla de inicio”</strong>.</p>
     </div>
   </section>
 
@@ -389,6 +400,35 @@
     if (confirm('¿Borrar TODOS los jugadores y puntos de este dispositivo?')) {
       data = emptyData(); save(); renderReport(); renderPlayers();
     }
+  };
+
+  /* ---------- Instalar como app (PWA) ---------- */
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let installEvent = null;
+  if (!isStandalone) {
+    if (isIOS) {
+      $('install-box').classList.remove('hidden');
+      $('ios-help').classList.remove('hidden');
+    }
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      installEvent = e;
+      $('install-box').classList.remove('hidden');
+      $('btn-install').classList.remove('hidden');
+    });
+    window.addEventListener('appinstalled', () => $('install-box').classList.add('hidden'));
+  }
+  $('btn-install').onclick = async () => {
+    if (!installEvent) return;
+    installEvent.prompt();
+    await installEvent.userChoice;
+    installEvent = null;
+    $('install-box').classList.add('hidden');
   };
 
   renderPlayers();
