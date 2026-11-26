@@ -128,6 +128,14 @@
       <button type="submit" id="adivi-btn" style="flex:0 0 auto">Responder</button>
     </form>
     <div class="feedback" id="adivi-fb"></div>
+    <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
+    <h2 class="daily-h">🔗 Completá la serie <span class="badge">+1 punto cada una</span></h2>
+    <p class="riddle-q" id="serie-q" style="letter-spacing:1px"></p>
+    <form id="serie-form" class="answer-row" autocomplete="off">
+      <input type="number" id="serie-answer" inputmode="numeric" placeholder="?" required>
+      <button type="submit" id="serie-btn" style="flex:0 0 auto">Responder</button>
+    </form>
+    <div class="feedback" id="serie-fb"></div>
   </section>
 
   <!-- Pantalla 2: configurar partida -->
@@ -189,6 +197,7 @@
     </div>
     <p class="hint" id="report-range" style="text-align:left"></p>
     <div style="overflow-x:auto"><table id="report-table"></table></div>
+    <div id="report-badges" style="margin-top:16px"></div>
     <div class="row" style="margin-top:16px">
       <button class="secondary" id="btn-prev-week">← Semana anterior</button>
       <button class="secondary" id="btn-next-week">Semana siguiente →</button>
@@ -205,7 +214,7 @@
 
   /* ---------- Almacenamiento: cookie local (con respaldo en localStorage) ---------- */
   const KEY = 'tablas_v1';
-  const emptyData = () => ({ players: {}, riddles: {}, adivi: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
+  const emptyData = () => ({ players: {}, riddles: {}, adivi: {}, series: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
 
   function readCookie() {
     const m = document.cookie.split('; ').find(c => c.startsWith(KEY + '='));
@@ -223,6 +232,7 @@
     if (!d || !d.players) return emptyData();
     d.riddles = d.riddles || {};
     d.adivi = d.adivi || {};
+    d.series = d.series || {};
     return d;
   }
   function save() {
@@ -232,8 +242,8 @@
   }
   function trimmed(d, days) {
     const limit = ymd(addDays(new Date(), -days));
-    const out = { players: {}, riddles: {}, adivi: {} };
-    for (const k of ['riddles', 'adivi'])
+    const out = { players: {}, riddles: {}, adivi: {}, series: {} };
+    for (const k of ['riddles', 'adivi', 'series'])
       for (const [day, byName] of Object.entries(d[k] || {})) if (day >= limit) out[k][day] = byName;
     for (const [name, byDay] of Object.entries(d.players)) {
       out.players[name] = {};
@@ -282,7 +292,7 @@
     names.forEach(n => {
       const b = document.createElement('button');
       b.textContent = '🧒 ' + n;
-      b.onclick = () => { player = n; $('setup-name').textContent = '¡Hola, ' + n + '!'; show('setup'); };
+      b.onclick = () => { player = n; const st = streak(n); $('setup-name').textContent = '¡Hola, ' + n + '!' + (st > 0 ? ' 🔥 Racha: ' + st + (st === 1 ? ' día' : ' días') : ''); show('setup'); };
       box.appendChild(b);
     });
     if (typeof renderDaily === 'function') renderDaily();
@@ -483,7 +493,7 @@
     $('report-range').textContent = 'Del ' + reportMonday.getDate() + '/' + (reportMonday.getMonth() + 1) +
       ' al ' + end.getDate() + '/' + (end.getMonth() + 1);
     const names = Object.keys(data.players);
-    if (!names.length) { $('report-table').innerHTML = '<tr><td>Todavía no hay jugadores.</td></tr>'; return; }
+    if (!names.length) { $('report-table').innerHTML = '<tr><td>Todavía no hay jugadores.</td></tr>'; $('report-badges').innerHTML = ''; return; }
     let html = '<tr><th>Nombre</th>' + DIAS.map((d, i) =>
       '<th class="' + (ymd(addDays(reportMonday, i)) === todayKey ? 'today' : '') + '">' + d + '</th>').join('') + '<th>Total</th></tr>';
     names.forEach(n => {
@@ -495,6 +505,7 @@
       html += '<td class="total">' + weekTotal(n, reportMonday) + '</td></tr>';
     });
     $('report-table').innerHTML = html;
+    renderBadges(names);
   }
   $('btn-report').onclick = () => { reportMonday = mondayOf(new Date()); renderReport(); show('report'); };
   $('btn-prev-week').onclick = () => { reportMonday = addDays(reportMonday, -7); renderReport(); };
@@ -617,6 +628,111 @@
   const riddleGame = dailyGame({ prefix: 'riddle', store: 'riddles', points: 2, item: () => ({ q: todayItem().q, a: todayItem().a }) });
   const adiviGame = dailyGame({ prefix: 'adivi', store: 'adivi', points: 1, item: todayAdivi });
 
+  /* ---------- Completá la serie (3 por día, 1 punto cada una) ---------- */
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  // Cada generador devuelve los términos que se muestran y el que sigue.
+  const SERIE_TYPES = [
+    r => { const d = [2,3,4,5,6,7,8,9,11,12][Math.floor(r()*10)], s = 1 + Math.floor(r()*15);
+           return [0,1,2,3,4].map(i => s + i*d).concat(s + 5*d); },                          // suma constante
+    r => { const d = [3,4,5,6,7,8,9,11,12][Math.floor(r()*9)];
+           return [1,2,3,4,5].map(i => i*d).concat(6*d); },                                  // tabla del d
+    r => { const x = 1 + Math.floor(r()*3), m = 2 + Math.floor(r()*2);
+           return [0,1,2,3].map(i => x*Math.pow(m,i)).concat(x*Math.pow(m,4)); },            // se multiplica
+    r => { const k = 1 + Math.floor(r()*8);
+           return [0,1,2,3].map(i => (k+i)*(k+i)).concat((k+4)*(k+4)); },                    // cuadrados
+    r => { const s = 1 + Math.floor(r()*10), t = [s]; let inc = 1;
+           while (t.length < 6) { t.push(t[t.length-1] + inc); inc++; } return t; },         // suma 1, 2, 3, 4…
+    r => { const s = 10 + Math.floor(r()*20), a = 5 + Math.floor(r()*5), b = 2 + Math.floor(r()*3);
+           const t = [s]; for (let i = 0; i < 5; i++) t.push(t[i] + (i % 2 === 0 ? a : -b)); return t; }, // +a, −b
+    r => { const f1 = 1 + Math.floor(r()*4), f2 = 1 + Math.floor(r()*4), t = [f1, f2];
+           while (t.length < 6) t.push(t[t.length-1] + t[t.length-2]); return t; }           // suma de los dos anteriores
+  ];
+  function todaySeries() {
+    const r = mulberry32(dayNumber() * 7919 + 13);
+    const idx = SERIE_TYPES.map((_, i) => i);
+    for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
+    return idx.slice(0, 3).map(k => { const t = SERIE_TYPES[k](r); return { shown: t.slice(0, -1), ans: t[t.length - 1] }; });
+  }
+  const serieGame = (function () {
+    const $q = $('serie-q'), $a = $('serie-answer'), $b = $('serie-btn'), $fb = $('serie-fb');
+    const state = name => { const d = data.series[ymd(new Date())]; return (d && d[name]) || { i: 0, r: [] }; };
+    function render(msg, cls) {
+      const name = $('riddle-player').value;
+      const off = v => { $a.disabled = v; $b.disabled = v; };
+      if (!name) { off(true); $q.textContent = ''; $fb.className = 'feedback'; $fb.textContent = 'Agregá un jugador para poder responder 👆'; return; }
+      const st = state(name), list = todaySeries();
+      if (st.i >= list.length) {
+        const k = st.r.filter(Boolean).length;
+        off(true); $q.textContent = '✅ Series de hoy completas';
+        $fb.className = 'feedback ' + (msg ? cls : 'good');
+        $fb.textContent = (msg || '') + 'Acertaste ' + k + ' de ' + list.length + ' (+' + k + (k === 1 ? ' punto' : ' puntos') + ')';
+        return;
+      }
+      off(false);
+      $q.textContent = 'Serie ' + (st.i + 1) + ' de ' + list.length + ': ' + list[st.i].shown.join(', ') + ', ?';
+      $fb.className = 'feedback ' + (msg ? cls : '');
+      $fb.textContent = msg || '';
+    }
+    $('serie-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const name = $('riddle-player').value;
+      if (!name || $a.value === '') return;
+      const st = state(name), list = todaySeries();
+      if (st.i >= list.length) return;
+      const ok = +$a.value === list[st.i].ans;
+      st.r.push(ok); st.i++;
+      if (ok) addPoints(name, 1);
+      const day = ymd(new Date());
+      data.series[day] = data.series[day] || {};
+      data.series[day][name] = st;
+      save();
+      $a.value = '';
+      render(ok ? '¡Correcto! +1 punto ⭐ ' : 'Era ' + list[st.i - 1].ans + '. ', ok ? 'good' : 'bad');
+    });
+    return { render: () => render(), update: () => render() };
+  })();
+
+  /* ---------- Racha e insignias ---------- */
+  function ptsOn(name, d) { return (data.players[name] && data.players[name][ymd(d)]) || 0; }
+  // Racha = días seguidos con puntos. Si hoy todavía no jugó, cuenta desde ayer (no la pierde hasta que termine el día).
+  function streak(name) {
+    let d = new Date();
+    if (ptsOn(name, d) === 0) d = addDays(d, -1);
+    let n = 0;
+    while (ptsOn(name, d) > 0 && n < 400) { n++; d = addDays(d, -1); }
+    return n;
+  }
+  function badgesOf(name) {
+    const out = [], st = streak(name);
+    const week = weekTotal(name, mondayOf(new Date()));
+    const total = Object.values(data.players[name] || {}).reduce((a, b) => a + b, 0);
+    if (st >= 3) out.push('🔥 Constante (' + st + ' días seguidos)');
+    if (st >= 7) out.push('🚀 Imparable (7 días seguidos)');
+    if (week >= 50) out.push('⭐ 50 puntos en la semana');
+    if (week >= 100) out.push('🌟 100 puntos en la semana');
+    if (week >= 200) out.push('🏅 Súper semana: 200 puntos');
+    if (total >= 500) out.push('🧠 Mente brillante: 500 puntos en total');
+    const day = ymd(new Date());
+    const g = (k) => data[k][day] && data[k][day][name];
+    if (g('riddles') && g('riddles').ok && g('adivi') && g('adivi').ok && g('series') && g('series').i >= 3 && g('series').r.every(Boolean))
+      out.push('🎯 Día perfecto: todo bien en las actividades de hoy');
+    return out;
+  }
+  function renderBadges(names) {
+    $('report-badges').innerHTML = '<strong>Rachas e insignias</strong>' + names.map(n => {
+      const st = streak(n), b = badgesOf(n);
+      return '<p style="margin:8px 0">🧒 <strong>' + esc(n) + '</strong> · 🔥 ' + st + (st === 1 ? ' día' : ' días') + ' seguidos' +
+        (b.length ? '<br><span class="hint" style="text-align:left;display:block">' + b.map(esc).join('<br>') + '</span>' : '') + '</p>';
+    }).join('');
+  }
+
   function renderDaily() {
     const item = todayItem();
     $('story-title').textContent = item.t;
@@ -627,10 +743,11 @@
     if (names.includes(prev)) sel.value = prev;
     riddleGame.render();
     adiviGame.render();
+    serieGame.render();
   }
   $('riddle-player').onchange = () => {
-    $('riddle-answer').value = ''; $('adivi-answer').value = '';
-    riddleGame.update(); adiviGame.update();
+    $('riddle-answer').value = ''; $('adivi-answer').value = ''; $('serie-answer').value = '';
+    riddleGame.update(); adiviGame.update(); serieGame.update();
   };
 
   /* ---------- Instalar como app (PWA) ---------- */
