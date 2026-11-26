@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tablas de multiplicar</title>
+<style>
+  :root {
+    --bg: #fff8e7; --card: #ffffff; --ink: #2b2d42; --muted: #6c7089;
+    --primary: #4361ee; --good: #2a9d8f; --bad: #e76f51; --accent: #ffb703;
+    --radius: 18px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink); min-height: 100vh;
+    display: flex; justify-content: center; padding: 16px;
+  }
+  main { width: 100%; max-width: 560px; }
+  h1 { text-align: center; margin: 8px 0 16px; font-size: 1.8rem; }
+  .card {
+    background: var(--card); border-radius: var(--radius); padding: 20px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.08); margin-bottom: 16px;
+  }
+  .hidden { display: none !important; }
+  button {
+    font: inherit; cursor: pointer; border: none; border-radius: 12px;
+    padding: 12px 18px; background: var(--primary); color: #fff; font-weight: bold;
+    transition: transform .08s, filter .15s;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: scale(.96); }
+  button.secondary { background: #e9ecff; color: var(--primary); }
+  button.ghost { background: transparent; color: var(--muted); font-weight: normal; text-decoration: underline; padding: 6px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  input[type=text], input[type=number] {
+    font: inherit; padding: 12px; border-radius: 12px; border: 2px solid #d8dcf0; width: 100%;
+  }
+  label { font-weight: bold; display: block; margin-bottom: 6px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row > * { flex: 1; }
+  .players { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+  .players button { flex: 1 1 40%; font-size: 1.1rem; }
+  .tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; margin: 10px 0; }
+  .tables label {
+    margin: 0; text-align: center; background: #f1f3ff; border-radius: 12px;
+    padding: 10px 0; cursor: pointer; border: 2px solid transparent; user-select: none;
+  }
+  .tables input { display: none; }
+  .tables input:checked + span { color: #fff; }
+  .tables label:has(input:checked) { background: var(--primary); color: #fff; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .score { background: var(--accent); color: #3a2a00; border-radius: 999px; padding: 6px 14px; font-weight: bold; }
+  .question { font-size: 3rem; text-align: center; margin: 18px 0; font-weight: bold; letter-spacing: 2px; }
+  .answer-row { display: flex; gap: 10px; }
+  .answer-row input { font-size: 1.6rem; text-align: center; }
+  .options { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; justify-content: center; }
+  .options button { font-size: 1.5rem; min-width: 72px; background: #e9ecff; color: var(--primary); }
+  .help { display: flex; gap: 10px; margin-top: 14px; }
+  .help button { flex: 1; }
+  .feedback { text-align: center; font-size: 1.3rem; font-weight: bold; min-height: 2.4em; margin-top: 14px; }
+  .feedback.good { color: var(--good); }
+  .feedback.bad { color: var(--bad); }
+  .hint { color: var(--muted); font-size: .9rem; text-align: center; margin-top: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+  th, td { padding: 8px 4px; text-align: center; border-bottom: 1px solid #eceefb; }
+  th:first-child, td:first-child { text-align: left; }
+  td.total { font-weight: bold; color: var(--primary); }
+  .today { background: #fff3c4; }
+  .pop { animation: pop .35s; }
+  @keyframes pop { 0% { transform: scale(.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>✖️ Tablas de multiplicar</h1>
+
+  <!-- Pantalla 1: elegir jugador -->
+  <section id="screen-home" class="card">
+    <label>¿Quién va a jugar?</label>
+    <div id="players" class="players"></div>
+    <div class="row">
+      <input type="text" id="new-name" placeholder="Nombre nuevo" maxlength="20">
+      <button id="btn-add" style="flex:0 0 auto">Agregar</button>
+    </div>
+    <div style="margin-top:16px; text-align:center">
+      <button class="secondary" id="btn-report">📊 Ver puntos de la semana</button>
+    </div>
+  </section>
+
+  <!-- Pantalla 2: configurar partida -->
+  <section id="screen-setup" class="card hidden">
+    <div class="topbar">
+      <strong id="setup-name"></strong>
+      <button class="ghost" data-back>← Cambiar jugador</button>
+    </div>
+    <label>¿Qué tablas querés practicar?</label>
+    <div id="tables" class="tables"></div>
+    <div class="row" style="margin-bottom:12px">
+      <button class="secondary" id="btn-all">Todas</button>
+      <button class="secondary" id="btn-none">Ninguna</button>
+    </div>
+    <label for="num-q">Cantidad de preguntas</label>
+    <input type="number" id="num-q" value="10" min="5" max="50">
+    <p class="hint">Sin ayuda = 3 puntos · Con opciones = 1 punto</p>
+    <button id="btn-start" style="width:100%; margin-top:8px; font-size:1.2rem">¡Empezar!</button>
+  </section>
+
+  <!-- Pantalla 3: juego -->
+  <section id="screen-game" class="card hidden">
+    <div class="topbar">
+      <span id="progress"></span>
+      <span class="score">⭐ <span id="session-score">0</span></span>
+    </div>
+    <div class="question" id="question"></div>
+    <form id="answer-form" class="answer-row" autocomplete="off">
+      <input type="number" id="answer" inputmode="numeric" placeholder="?" required>
+      <button type="submit" style="flex:0 0 auto">Responder</button>
+    </form>
+    <div class="help">
+      <button type="button" class="secondary" id="opt3">💡 3 opciones</button>
+      <button type="button" class="secondary" id="opt5">💡 5 opciones</button>
+    </div>
+    <div class="options" id="options"></div>
+    <div class="feedback" id="feedback"></div>
+    <div style="text-align:center"><button class="ghost" id="btn-quit">Terminar ahora</button></div>
+  </section>
+
+  <!-- Pantalla 4: resultado -->
+  <section id="screen-result" class="card hidden" style="text-align:center">
+    <h2>¡Terminaste! 🎉</h2>
+    <p style="font-size:1.2rem">Aciertos: <strong id="res-correct"></strong> de <strong id="res-total"></strong></p>
+    <p style="font-size:2rem" class="pop">⭐ <strong id="res-points"></strong> puntos</p>
+    <p class="hint" id="res-week"></p>
+    <div class="row" style="margin-top:16px">
+      <button id="btn-again">Jugar de nuevo</button>
+      <button class="secondary" data-back>Inicio</button>
+    </div>
+  </section>
+
+  <!-- Pantalla 5: reporte semanal -->
+  <section id="screen-report" class="card hidden">
+    <div class="topbar">
+      <strong>Puntos de la semana</strong>
+      <button class="ghost" data-back>← Volver</button>
+    </div>
+    <p class="hint" id="report-range" style="text-align:left"></p>
+    <div style="overflow-x:auto"><table id="report-table"></table></div>
+    <div class="row" style="margin-top:16px">
+      <button class="secondary" id="btn-prev-week">← Semana anterior</button>
+      <button class="secondary" id="btn-next-week">Semana siguiente →</button>
+    </div>
+    <div style="text-align:center; margin-top:14px">
+      <button class="ghost" id="btn-reset">Borrar todos los datos</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---------- Almacenamiento: cookie local (con respaldo en localStorage) ---------- */
+  const KEY = 'tablas_v1';
+  const emptyData = () => ({ players: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
+
+  function readCookie() {
+    const m = document.cookie.split('; ').find(c => c.startsWith(KEY + '='));
+    if (!m) return null;
+    try { return JSON.parse(decodeURIComponent(m.slice(KEY.length + 1))); } catch (e) { return null; }
+  }
+  function writeCookie(data) {
+    const exp = new Date(); exp.setFullYear(exp.getFullYear() + 2);
+    document.cookie = KEY + '=' + encodeURIComponent(JSON.stringify(data)) +
+      '; expires=' + exp.toUTCString() + '; path=/; SameSite=Lax';
+  }
+  function load() {
+    let d = readCookie();
+    if (!d) { try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) { d = null; } }
+    return d && d.players ? d : emptyData();
+  }
+  function save() {
+    // Las cookies tienen tope de ~4 KB: guardamos solo los últimos 60 días por jugador en la cookie
+    writeCookie(trimmed(data, 60));
+    try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
+  }
+  function trimmed(d, days) {
+    const limit = ymd(addDays(new Date(), -days));
+    const out = { players: {} };
+    for (const [name, byDay] of Object.entries(d.players)) {
+      out.players[name] = {};
+      for (const [day, pts] of Object.entries(byDay)) if (day >= limit) out.players[name][day] = pts;
+    }
+    return out;
+  }
+
+  let data = load();
+
+  /* ---------- Fechas ---------- */
+  const pad = n => String(n).padStart(2, '0');
+  const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  function mondayOf(d) { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; }
+  const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+  function addPoints(name, pts) {
+    const day = ymd(new Date());
+    data.players[name][day] = (data.players[name][day] || 0) + pts;
+    save();
+  }
+  function weekTotal(name, monday) {
+    let t = 0;
+    for (let i = 0; i < 7; i++) t += data.players[name][ymd(addDays(monday, i))] || 0;
+    return t;
+  }
+
+  /* ---------- Utilidades de UI ---------- */
+  const $ = id => document.getElementById(id);
+  const screens = ['home', 'setup', 'game', 'result', 'report'];
+  function show(name) { screens.forEach(s => $('screen-' + s).classList.toggle('hidden', s !== name)); }
+  const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const rand = n => Math.floor(Math.random() * n);
+  function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+
+  /* ---------- Jugadores ---------- */
+  let player = null;
+  function renderPlayers() {
+    const box = $('players');
+    const names = Object.keys(data.players);
+    box.innerHTML = names.length ? '' : '<p class="hint">Agregá un nombre para empezar 👇</p>';
+    names.forEach(n => {
+      const b = document.createElement('button');
+      b.textContent = '🧒 ' + n;
+      b.onclick = () => { player = n; $('setup-name').textContent = '¡Hola, ' + n + '!'; show('setup'); };
+      box.appendChild(b);
+    });
+  }
+  function addPlayer() {
+    const name = $('new-name').value.trim();
+    if (!name) return;
+    if (!data.players[name]) { data.players[name] = {}; save(); }
+    $('new-name').value = '';
+    renderPlayers();
+  }
+  $('btn-add').onclick = addPlayer;
+  $('new-name').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
+  document.querySelectorAll('[data-back]').forEach(b => b.onclick = () => { renderPlayers(); show('home'); });
+
+  /* ---------- Configuración ---------- */
+  const tablesBox = $('tables');
+  for (let i = 1; i <= 12; i++) {
+    const l = document.createElement('label');
+    l.innerHTML = '<input type="checkbox" value="' + i + '"' + (i <= 10 && i >= 2 ? ' checked' : '') + '><span>' + i + '</span>';
+    tablesBox.appendChild(l);
+  }
+  const setAll = v => tablesBox.querySelectorAll('input').forEach(i => i.checked = v);
+  $('btn-all').onclick = () => setAll(true);
+  $('btn-none').onclick = () => setAll(false);
+
+  /* ---------- Juego ---------- */
+  let cfg = {}, game = null;
+
+  function newQuestion() {
+    // Evita repetir la misma pregunta dos veces seguidas
+    let a, b, tries = 0;
+    do {
+      a = cfg.tables[rand(cfg.tables.length)];
+      b = 1 + rand(12);
+      tries++;
+    } while (game.last === a + 'x' + b && tries < 20);
+    game.last = a + 'x' + b;
+    return { a, b, ans: a * b, usedOptions: false, answered: false };
+  }
+
+  function startGame() {
+    const tables = [...tablesBox.querySelectorAll('input:checked')].map(i => +i.value);
+    if (!tables.length) { alert('Elegí al menos una tabla'); return; }
+    const n = Math.max(5, Math.min(50, +$('num-q').value || 10));
+    cfg = { tables, n };
+    game = { i: 0, correct: 0, points: 0, last: '', q: null };
+    show('game');
+    nextQuestion();
+  }
+
+  function nextQuestion() {
+    if (game.i >= cfg.n) return finish();
+    game.i++;
+    game.q = newQuestion();
+    $('progress').textContent = 'Pregunta ' + game.i + ' de ' + cfg.n;
+    $('session-score').textContent = game.points;
+    $('question').textContent = game.q.a + ' × ' + game.q.b + ' = ?';
+    $('answer').value = '';
+    $('options').innerHTML = '';
+    setFeedback('', '');
+    setInputEnabled(true);
+    $('answer').focus();
+  }
+
+  function setInputEnabled(on) {
+    $('answer').disabled = !on;
+    $('answer-form').querySelector('button').disabled = !on;
+    $('opt3').disabled = !on || game.q.usedOptions;
+    $('opt5').disabled = !on || game.q.usedOptions;
+  }
+  function setFeedback(text, cls) { const f = $('feedback'); f.textContent = text; f.className = 'feedback ' + cls; }
+
+  function makeOptions(count) {
+    const q = game.q;
+    q.usedOptions = true;
+    const set = new Set([q.ans]);
+    // Distractores creíbles: resultados de tablas vecinas y números cercanos
+    const cands = shuffle([q.a * (q.b + 1), q.a * (q.b - 1), (q.a + 1) * q.b, (q.a - 1) * q.b,
+                           q.ans + 10, q.ans - 10, q.ans + 1, q.ans - 1, q.ans + 2, q.ans - 2]);
+    for (const c of cands) { if (set.size >= count) break; if (c > 0) set.add(c); }
+    let extra = 3; while (set.size < count) set.add(q.ans + (extra++));
+    const box = $('options'); box.innerHTML = '';
+    shuffle([...set]).forEach(v => {
+      const b = document.createElement('button');
+      b.textContent = v;
+      b.onclick = () => resolve(v);
+      box.appendChild(b);
+    });
+    $('opt3').disabled = true; $('opt5').disabled = true;
+  }
+  $('opt3').onclick = () => makeOptions(3);
+  $('opt5').onclick = () => makeOptions(5);
+
+  $('answer-form').addEventListener('submit', e => {
+    e.preventDefault();
+    if (game.q.answered || $('answer').value === '') return;
+    resolve(+$('answer').value);
+  });
+
+  function resolve(value) {
+    const q = game.q;
+    if (q.answered) return;
+    q.answered = true;
+    setInputEnabled(false);
+    document.querySelectorAll('#options button').forEach(b => b.disabled = true);
+    if (value === q.ans) {
+      const pts = q.usedOptions ? 1 : 3;
+      game.points += pts; game.correct++;
+      addPoints(player, pts);
+      setFeedback('¡Correcto! +' + pts + (pts === 1 ? ' punto' : ' puntos') + ' 🎉', 'good');
+    } else {
+      setFeedback('Casi… ' + q.a + ' × ' + q.b + ' = ' + q.ans, 'bad');
+    }
+    $('session-score').textContent = game.points;
+    setTimeout(nextQuestion, value === q.ans ? 1100 : 2200);
+  }
+
+  function finish() {
+    show('result');
+    $('res-correct').textContent = game.correct;
+    $('res-total').textContent = cfg.n;
+    $('res-points').textContent = game.points;
+    $('res-week').textContent = 'Total de la semana: ' + weekTotal(player, mondayOf(new Date())) + ' puntos';
+  }
+
+  $('btn-start').onclick = startGame;
+  $('btn-again').onclick = () => show('setup');
+  $('btn-quit').onclick = () => { if (confirm('¿Terminar ahora?')) { game.i = cfg.n; if (game.q) game.q.answered = true; finish(); } };
+
+  /* ---------- Reporte semanal ---------- */
+  let reportMonday = mondayOf(new Date());
+  function renderReport() {
+    const todayKey = ymd(new Date());
+    const end = addDays(reportMonday, 6);
+    $('report-range').textContent = 'Del ' + reportMonday.getDate() + '/' + (reportMonday.getMonth() + 1) +
+      ' al ' + end.getDate() + '/' + (end.getMonth() + 1);
+    const names = Object.keys(data.players);
+    if (!names.length) { $('report-table').innerHTML = '<tr><td>Todavía no hay jugadores.</td></tr>'; return; }
+    let html = '<tr><th>Nombre</th>' + DIAS.map((d, i) =>
+      '<th class="' + (ymd(addDays(reportMonday, i)) === todayKey ? 'today' : '') + '">' + d + '</th>').join('') + '<th>Total</th></tr>';
+    names.forEach(n => {
+      html += '<tr><td>' + esc(n) + '</td>';
+      for (let i = 0; i < 7; i++) {
+        const k = ymd(addDays(reportMonday, i));
+        html += '<td class="' + (k === todayKey ? 'today' : '') + '">' + (data.players[n][k] || 0) + '</td>';
+      }
+      html += '<td class="total">' + weekTotal(n, reportMonday) + '</td></tr>';
+    });
+    $('report-table').innerHTML = html;
+  }
+  $('btn-report').onclick = () => { reportMonday = mondayOf(new Date()); renderReport(); show('report'); };
+  $('btn-prev-week').onclick = () => { reportMonday = addDays(reportMonday, -7); renderReport(); };
+  $('btn-next-week').onclick = () => { reportMonday = addDays(reportMonday, 7); renderReport(); };
+  $('btn-reset').onclick = () => {
+    if (confirm('¿Borrar TODOS los jugadores y puntos de este dispositivo?')) {
+      data = emptyData(); save(); renderReport(); renderPlayers();
+    }
+  };
+
+  renderPlayers();
+  show('home');
+})();
+</script>
+</body>
+</html>
