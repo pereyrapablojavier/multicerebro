@@ -106,6 +106,11 @@
   .term.q { background: var(--accent); color: #3a2a00; animation: pulse 1.4s infinite; }
   @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
   .serie-done { text-align: center; font-weight: bold; color: var(--good); }
+  .kbanner { background: linear-gradient(135deg, #4361ee, #9b5de5); color: #fff; border-radius: 18px; padding: 16px 14px; text-align: center; margin-bottom: 14px; box-shadow: 0 4px 12px rgba(67,97,238,.3); }
+  .kbanner .ktitle { font-size: 1.4rem; font-weight: bold; line-height: 1.25; }
+  .kbanner .ksub { font-size: 1.1rem; margin-top: 6px; line-height: 1.35; }
+  .kbanner .knote { font-size: .95rem; margin-top: 8px; opacity: .9; }
+  .bsummary { text-align: center; font-size: 1.2rem; font-weight: bold; margin: 8px 0 4px; }
   .badge-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
   .bcard { border-radius: 16px; padding: 12px 8px; text-align: center; background: #f6f7ff; border: 3px solid transparent; }
   .bcard .bicon { font-size: 2.2rem; line-height: 1.2; }
@@ -226,9 +231,13 @@
       <button class="back" data-back>⬅ Volver</button>
       <strong>🏆 Mi colección</strong>
     </div>
-    <p class="hint" style="text-align:left">Inspiradas en KATSEYE, el grupo global de HYBE × Geffen. App no oficial. ¡Ganalas jugando!</p>
+    <div class="kbanner">
+      <div class="ktitle">✨ Inspiradas en KATSEYE ✨</div>
+      <div class="ksub">El grupo global de HYBE × Geffen. ¡Ganalas jugando!</div>
+      <div class="knote">App no oficial</div>
+    </div>
     <select id="badge-player"></select>
-    <p class="hint" id="badge-summary"></p>
+    <p class="bsummary" id="badge-summary"></p>
     <div class="badge-grid" id="badge-grid"></div>
     <button class="back wide" data-back>⬅ Volver al inicio</button>
   </section>
