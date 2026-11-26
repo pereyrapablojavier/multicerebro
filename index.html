@@ -103,6 +103,13 @@
   .bcard.locked { filter: grayscale(1); opacity: .6; }
   .bcard.won { background: #fff7d6; border-color: var(--accent); }
   .bcard.won .bbar > i { background: var(--good); }
+  .toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 50; width: min(92vw, 420px);
+    display: flex; align-items: center; gap: 12px; background: #2b2d42; color: #fff; border-radius: 18px; padding: 12px 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35); border: 3px solid var(--accent); cursor: pointer; animation: slidein .4s; }
+  .toast .ticon { font-size: 2.4rem; }
+  .toast small { color: #cfd3f5; }
+  @keyframes slidein { from { transform: translate(-50%, -140%); } to { transform: translate(-50%, 0); } }
+  .bcard .new { display: inline-block; background: var(--bad); color: #fff; border-radius: 999px; padding: 1px 8px; font-size: .7rem; font-weight: bold; margin-bottom: 2px; }
   .pop { animation: pop .35s; }
   @keyframes pop { 0% { transform: scale(.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 </style>
@@ -121,7 +128,7 @@
     </div>
     <div style="margin-top:16px; text-align:center">
       <button class="secondary" id="btn-report">📊 Puntos de la semana</button>
-      <button class="secondary" id="btn-badges" style="margin-top:8px">🏆 Insignias</button>
+      <button class="secondary" id="btn-badges" style="margin-top:8px">🏆 Mi colección</button>
     </div>
     <div id="install-box" class="hidden" style="margin-top:16px; text-align:center">
       <button id="btn-install" class="hidden" style="background:var(--good)">📲 Instalar en el celular</button>
@@ -131,28 +138,10 @@
 
   <!-- Historia y acertijo del día (se muestran junto a la pantalla de inicio) -->
   <section id="screen-daily" class="card">
-    <h2 class="daily-h">📖 Historia del día</h2>
-    <h3 class="story-title" id="story-title"></h3>
-    <p class="story-text" id="story-text"></p>
-    <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
     <label for="riddle-player">¿Quién responde hoy?</label>
     <select id="riddle-player"></select>
-    <h2 class="daily-h">🧩 Acertijo del día <span class="badge">+2 puntos</span></h2>
-    <p class="riddle-q" id="riddle-q"></p>
-    <form id="riddle-form" class="answer-row" autocomplete="off">
-      <input type="number" id="riddle-answer" inputmode="numeric" placeholder="?" required>
-      <button type="submit" id="riddle-btn" style="flex:0 0 auto">Responder</button>
-    </form>
-    <div class="feedback" id="riddle-fb"></div>
-    <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
-    <h2 class="daily-h">🔢 Adivinanza de números <span class="badge">+1 punto</span></h2>
-    <p class="riddle-q" id="adivi-q"></p>
-    <form id="adivi-form" class="answer-row" autocomplete="off">
-      <input type="number" id="adivi-answer" inputmode="numeric" placeholder="?" required>
-      <button type="submit" id="adivi-btn" style="flex:0 0 auto">Responder</button>
-    </form>
-    <div class="feedback" id="adivi-fb"></div>
-    <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
+    <div id="stories-box"></div>
+    <div id="adivi-box"></div>
     <h2 class="daily-h">🔗 Completá la serie <span class="badge">+1 punto cada una</span></h2>
     <div id="serie-q"></div>
     <form id="serie-form" class="answer-row" autocomplete="off">
@@ -208,15 +197,18 @@
     <p style="font-size:2rem" class="pop">⭐ <strong id="res-points"></strong> puntos</p>
     <p class="hint" id="res-week"></p>
     <div class="row" style="margin-top:16px">
+      <button class="secondary" id="btn-res-badges">🏆 Mi colección</button>
       <button id="btn-again">Jugar de nuevo</button>
       <button class="secondary" data-back>Inicio</button>
     </div>
   </section>
 
+  <div id="toast" class="toast hidden"></div>
+
   <!-- Pantalla 6: galería de insignias -->
   <section id="screen-badges" class="card hidden">
     <div class="topbar">
-      <strong>🏆 Insignias</strong>
+      <strong>🏆 Mi colección</strong>
       <button class="ghost" data-back>← Volver</button>
     </div>
     <p class="hint" style="text-align:left">Inspiradas en KATSEYE, el grupo global de HYBE × Geffen. App no oficial. ¡Ganalas jugando!</p>
@@ -250,7 +242,7 @@
 
   /* ---------- Almacenamiento: cookie local (con respaldo en localStorage) ---------- */
   const KEY = 'tablas_v1';
-  const emptyData = () => ({ players: {}, riddles: {}, adivi: {}, series: {}, stats: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
+  const emptyData = () => ({ players: {}, riddles: {}, adivi: {}, series: {}, stats: {}, earned: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
 
   function readCookie() {
     const m = document.cookie.split('; ').find(c => c.startsWith(KEY + '='));
@@ -270,16 +262,23 @@
     d.adivi = d.adivi || {};
     d.series = d.series || {};
     d.stats = d.stats || {};
+    d.earned = d.earned || {};
     return d;
   }
-  function save() {
+  function persist() {
     // Las cookies tienen tope de ~4 KB: guardamos solo los últimos 60 días por jugador en la cookie
     writeCookie(trimmed(data, 60));
     try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {}
   }
+  // Después de cada cambio se revisa si el jugador que acaba de sumar ganó una insignia nueva
+  let actor = null;
+  function save() {
+    persist();
+    if (actor) checkNewBadges(actor);
+  }
   function trimmed(d, days) {
     const limit = ymd(addDays(new Date(), -days));
-    const out = { players: {}, riddles: {}, adivi: {}, series: {}, stats: d.stats || {} };
+    const out = { players: {}, riddles: {}, adivi: {}, series: {}, stats: d.stats || {}, earned: d.earned || {} };
     for (const k of ['riddles', 'adivi', 'series'])
       for (const [day, byName] of Object.entries(d[k] || {})) if (day >= limit) out[k][day] = byName;
     for (const [name, byDay] of Object.entries(d.players)) {
@@ -301,6 +300,7 @@
   function addPoints(name, pts) {
     const day = ymd(new Date());
     data.players[name][day] = (data.players[name][day] || 0) + pts;
+    actor = name;
     save();
   }
   function weekTotal(name, monday) {
@@ -511,6 +511,7 @@
   function finish() {
     if (!game.quit) {
       const st = data.stats[player] = data.stats[player] || { games: 0, all: 0, prac: 0, perfect: 0 };
+      actor = player;
       st.games++;
       if (cfg.scoring) { st.all++; if (cfg.n >= 10 && game.correct === cfg.n) st.perfect++; } else st.prac++;
       save();
@@ -591,7 +592,22 @@
     { t: "El descuento de la tienda", s: "Para calcular el 10 % de un precio hay que dividirlo por 10. El 20 % es el doble del 10 %. Con ese truco se calculan los descuentos sin calculadora.", q: "Una mochila cuesta $4.500 y tiene 20 % de descuento. ¿Cuánto cuesta con el descuento?", a: 3600 },
     { t: "La Tierra y las horas", s: "La Tierra da una vuelta completa (360 grados) sobre sí misma en 24 horas. Si dividimos 360 entre 24, nos da que gira 15 grados cada hora.", q: "Si gira 15 grados por hora, ¿cuántos grados gira en 18 horas?", a: 270 },
     { t: "Las figuras y sus lados", s: "Un triángulo tiene 3 lados, un cuadrado 4, un pentágono 5 y un hexágono 6. Los arquitectos y los diseñadores combinan estas figuras para armar mosaicos y pisos.", q: "Tengo 4 hexágonos, 3 pentágonos, 2 cuadrados y 5 triángulos. ¿Cuántos lados hay en total?", a: 62 },
-    { t: "El dominó", s: "El juego de dominó tiene 28 fichas y cada ficha tiene 2 mitades con puntos, de 0 a 6. Los 7 números distintos (0, 1, 2, 3, 4, 5 y 6) aparecen exactamente la misma cantidad de veces en todo el juego.", q: "¿Cuántas veces aparece cada número en un juego completo de dominó?", a: 8 }
+    { t: "El dominó", s: "El juego de dominó tiene 28 fichas y cada ficha tiene 2 mitades con puntos, de 0 a 6. Los 7 números distintos (0, 1, 2, 3, 4, 5 y 6) aparecen exactamente la misma cantidad de veces en todo el juego.", q: "¿Cuántas veces aparece cada número en un juego completo de dominó?", a: 8 },
+    { t: "Los bolos", s: "Un juego de bolos acomoda los pines en forma de triángulo: 1 pin adelante, 2 en la segunda fila, 3 en la tercera y 4 en la última. En total son 1 + 2 + 3 + 4 = 10 pines.", q: "Si el triángulo tuviera 6 filas (1, 2, 3, 4, 5 y 6 pines), ¿cuántos pines habría en total?", a: 21 },
+    { t: "El piso de baldosas", s: "Los albañiles calculan cuántas baldosas necesitan multiplicando las filas por las baldosas de cada fila. Después compran unas pocas de más por si alguna se rompe.", q: "Un piso tiene 12 filas de 15 baldosas. Si se rompieron 8 baldosas, ¿cuántas quedaron sanas?", a: 172 },
+    { t: "El secreto del círculo", s: "Hace miles de años se descubrió algo curioso: el contorno de cualquier círculo mide un poco más de 3 veces su ancho. Con la cuenta redonda de multiplicar por 3 ya se obtiene una buena aproximación.", q: "Un plato mide 30 cm de ancho. Usando la regla de ×3, ¿cuántos cm mide su contorno, aproximadamente?", a: 90 },
+    { t: "La alcancía de Tomás", s: "Ahorrar es sumar un poquito cada semana. Para saber cuánto falta, se divide lo que querés juntar por lo que ahorrás cada vez.", q: "Tomás ahorra $120 por semana. ¿Cuántas semanas necesita para juntar $960?", a: 8 },
+    { t: "El cubo de cubitos", s: "Un cubo de 2 × 2 × 2 está formado por 8 cubitos y uno de 3 × 3 × 3 por 27. Para saber cuántos cubitos forman un cubo hay que multiplicar tres veces el largo de su lado.", q: "¿Cuántos cubitos forman un cubo de 4 × 4 × 4?", a: 64 },
+    { t: "Las vueltas de la Luna", s: "La Luna da una vuelta alrededor de la Tierra en casi 28 días. En números redondos, usemos 28 días por vuelta para hacer cuentas fáciles.", q: "¿Cuántos días pasan en 4 vueltas completas de la Luna?", a: 112 },
+    { t: "Los ladrillos de construcción", s: "Las piezas de construir tienen botoncitos arriba. Una pieza de 2 × 4 tiene 8 botoncitos y una de 2 × 2 tiene 4. Para saber cuántos hay en una torre, sumás lo que aporta cada tipo de pieza.", q: "Una torre usa 7 piezas de 2 × 4 y 5 piezas de 2 × 2. ¿Cuántos botoncitos hay en total?", a: 76 },
+    { t: "Mil metros, un kilómetro", s: "Un kilómetro tiene 1.000 metros y un metro tiene 100 centímetros. Por eso un kilómetro son 100.000 centímetros.", q: "Si cada paso mide 50 cm, ¿cuántos pasos hacen falta para recorrer 1 kilómetro?", a: 2000 },
+    { t: "La granja y sus patas", s: "En una granja hay animales de dos patas, como las gallinas y los patos, y de cuatro patas, como las vacas. Contar las patas es una forma divertida de practicar la multiplicación.", q: "En una granja hay 8 gallinas, 6 vacas y 5 patos. ¿Cuántas patas hay en total?", a: 50 },
+    { t: "El minutero", s: "La aguja de los minutos da una vuelta completa de 360 grados en 60 minutos. Si dividís 360 entre 60, resulta que gira 6 grados cada minuto.", q: "Si el minutero gira 6 grados por minuto, ¿cuántos grados gira en 25 minutos?", a: 150 },
+    { t: "Las damas", s: "El tablero de damas tiene 64 casillas, pero solo se juega en las 32 oscuras. Cada jugador empieza con 12 fichas, y las fichas van sobre casillas oscuras.", q: "Si empiezan los 2 jugadores con 12 fichas cada uno, ¿cuántas casillas oscuras quedan libres al comienzo?", a: 8 },
+    { t: "La maratón", s: "Una maratón es una carrera de 42 kilómetros. La distancia viene de una antigua leyenda griega de un mensajero que corrió desde un pueblo hasta Atenas.", q: "Corrés 6 kilómetros por día. ¿Cuántos días necesitás para sumar la distancia de 5 maratones (5 × 42 km)?", a: 35 },
+    { t: "La torta de cumpleaños", s: "En la torta de cumpleaños, las velitas se acomodan en filas para que sea fácil contarlas. Cada vez que alguien sopla, se apagan unas cuantas.", q: "Una torta tiene 6 filas de 8 velitas. Se apagan 19. ¿Cuántas velitas quedan encendidas?", a: 29 },
+    { t: "Los segundos de un día", s: "Un minuto tiene 60 segundos y una hora tiene 60 minutos. Para pasar de horas a segundos hay que multiplicar dos veces por 60.", q: "¿Cuántos segundos tienen 2 horas?", a: 7200 },
+    { t: "El mapa y la escala", s: "En un mapa, una distancia chiquita representa una distancia enorme. La escala te dice cuánto: por ejemplo, 1 cm del mapa puede ser 5 km en la realidad.", q: "En un mapa, 1 cm representa 5 km. Dos ciudades están a 14 cm en el mapa. ¿Cuántos kilómetros hay entre ellas?", a: 70 }
   ];
   // Adivinanzas de números (una por día, distinta rotación que el acertijo)
   const ADIVI = [
@@ -624,20 +640,62 @@
     { q: "Soy un número primo mayor que 40 y menor que 50, y mis cifras suman 11. ¿Qué número soy?", a: 47 },
     { q: "Compré 3 lápices y 2 cuadernos por $26. Cada lápiz cuesta $4. ¿Cuánto cuesta cada cuaderno?", a: 7 },
     { q: "El producto de dos números seguidos (consecutivos) es 90. ¿Cuál es el mayor de los dos?", a: 10 },
-    { q: "Aparezco en la tabla del 8 y tengo dos cifras iguales. ¿Qué número soy?", a: 88 }
+    { q: "Aparezco en la tabla del 8 y tengo dos cifras iguales. ¿Qué número soy?", a: 88 },
+    { q: "Soy un número de dos cifras. La cifra de las unidades es el triple de la de las decenas y mis cifras suman 12. ¿Qué número soy?", a: 39 },
+    { q: "Si me dividís por 4 y al resultado le sumás 6, llegás a 14. ¿Qué número soy?", a: 32 },
+    { q: "Soy un número impar entre 40 y 50 y me puedo dividir exacto por 3 y por 5. ¿Qué número soy?", a: 45 },
+    { q: "Si me multiplicás por 9, llegás a 108. ¿Qué número soy?", a: 12 },
+    { q: "Una rana está en el fondo de un pozo de 15 metros. De día salta 6 metros y de noche resbala 3. ¿En cuántos días logra salir?", a: 4 },
+    { q: "Tengo el triple de la edad de mi hijo y entre los dos sumamos 48 años. ¿Cuántos años tengo yo?", a: 36 },
+    { q: "Soy un número primo entre 50 y 60 y mis cifras suman 8. ¿Qué número soy?", a: 53 },
+    { q: "Si a mi doble le restás 9 obtenés 25. ¿Qué número soy?", a: 17 },
+    { q: "Estoy justo en el medio entre el 38 y el 74. ¿Qué número soy?", a: 56 },
+    { q: "¿Cuántos números pares hay entre 1 y 20, sin contar ni el 1 ni el 20?", a: 9 },
+    { q: "Soy un múltiplo de 11 de dos cifras y mis cifras suman 10. ¿Qué número soy?", a: 55 },
+    { q: "Compré 5 cuadernos iguales y pagué con $1.000. Me dieron $250 de vuelto. ¿Cuánto cuesta cada cuaderno?", a: 150 },
+    { q: "Si me multiplicás por 5 y le restás 7, da lo mismo que multiplicarme por 2 y sumarle 14. ¿Qué número soy?", a: 7 },
+    { q: "Una caja tiene 6 filas de 7 bombones. Si me como 2 filas completas, ¿cuántos bombones quedan?", a: 28 },
+    { q: "Soy la cantidad de días que hay en 3 semanas más 2 días. ¿Qué número soy?", a: 23 }
   ];
   const MAX_TRIES = 3;
+  const STORY_SLOTS = 2, ADIVI_SLOTS = 2;   // cuántas historias y adivinanzas por día
   function dayNumber() {
     const n = new Date();
     return Math.floor(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 86400000);
   }
-  const todayItem = () => DAILY[dayNumber() % DAILY.length];
-  const todayAdivi = () => ADIVI[(dayNumber() + 7) % ADIVI.length];
+  const todayItem = k => DAILY[(dayNumber() * STORY_SLOTS + k) % DAILY.length];
+  const todayAdivi = k => ADIVI[(dayNumber() * ADIVI_SLOTS + k + 7) % ADIVI.length];
+  // Clave con la que se guarda el resultado de cada jugador en cada casillero (el 1.º queda igual que antes)
+  const slotKey = (name, k) => k === 0 ? name : name + '~' + k;
+
+  const HR = '<hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">';
+  function gameHtml(prefix, title, badge) {
+    return '<h2 class="daily-h">' + title + ' <span class="badge">' + badge + '</span></h2>' +
+      '<p class="riddle-q" id="' + prefix + '-q"></p>' +
+      '<form id="' + prefix + '-form" class="answer-row" autocomplete="off">' +
+      '<input type="number" id="' + prefix + '-answer" inputmode="numeric" placeholder="?" required>' +
+      '<button type="submit" id="' + prefix + '-btn" style="flex:0 0 auto">Responder</button></form>' +
+      '<div class="feedback" id="' + prefix + '-fb"></div>';
+  }
+  (function buildDaily() {
+    let h = '';
+    for (let k = 0; k < STORY_SLOTS; k++) {
+      h += (k ? HR : '') +
+        '<h2 class="daily-h">📖 Historia ' + (k + 1) + '</h2>' +
+        '<h3 class="story-title" id="story-title-' + k + '"></h3>' +
+        '<p class="story-text" id="story-text-' + k + '"></p>' +
+        gameHtml('riddle' + k, '🧩 Acertijo ' + (k + 1), '+2 puntos');
+    }
+    $('stories-box').innerHTML = h;
+    let g = '';
+    for (let k = 0; k < ADIVI_SLOTS; k++) g += HR + gameHtml('adivi' + k, '🔢 Adivinanza ' + (k + 1), '+1 punto');
+    $('adivi-box').innerHTML = g + HR;
+  })();
 
   // Un "juego diario" (acertijo o adivinanza): comparte la misma mecánica, cambia el contenido y los puntos.
   function dailyGame(o) {
     const $q = $(o.prefix + '-q'), $a = $(o.prefix + '-answer'), $b = $(o.prefix + '-btn'), $fb = $(o.prefix + '-fb');
-    const state = name => { const d = data[o.store][ymd(new Date())]; return (d && d[name]) || { t: 0, ok: false }; };
+    const state = name => { const d = data[o.store][ymd(new Date())]; return (d && d[slotKey(name, o.slot)]) || { t: 0, ok: false }; };
     function update(wrong) {
       const name = $('riddle-player').value;
       const off = v => { $a.disabled = v; $b.disabled = v; };
@@ -661,15 +719,17 @@
       if (good) { st.ok = true; addPoints(name, o.points); }
       const day = ymd(new Date());
       data[o.store][day] = data[o.store][day] || {};
-      data[o.store][day][name] = st;
+      data[o.store][day][slotKey(name, o.slot)] = st;
       save();
       $a.value = '';
       update(!good);
     });
-    return { render() { $q.textContent = o.item().q; update(); }, update };
+    return { render() { $q.textContent = o.item().q; update(); }, update, clear() { $a.value = ''; } };
   }
-  const riddleGame = dailyGame({ prefix: 'riddle', store: 'riddles', points: 2, item: () => ({ q: todayItem().q, a: todayItem().a }) });
-  const adiviGame = dailyGame({ prefix: 'adivi', store: 'adivi', points: 1, item: todayAdivi });
+  const riddleGames = Array.from({ length: STORY_SLOTS }, (_, k) =>
+    dailyGame({ prefix: 'riddle' + k, store: 'riddles', slot: k, points: 2, item: () => ({ q: todayItem(k).q, a: todayItem(k).a }) }));
+  const adiviGames = Array.from({ length: ADIVI_SLOTS }, (_, k) =>
+    dailyGame({ prefix: 'adivi' + k, store: 'adivi', slot: k, points: 1, item: () => todayAdivi(k) }));
 
   /* ---------- Completá la serie (3 por día, 1 punto cada una) ---------- */
   function mulberry32(a) {
@@ -777,9 +837,10 @@
     days.forEach(k => { const m = ymd(mondayOf(parseDay(k))); weeks[m] = (weeks[m] || 0) + byDay[k]; });
     const g = (store, k) => (data[store][k] && data[store][k][name]) || null;
     const seriesOk = Object.keys(data.series).some(k => { const x = g('series', k); return x && x.i >= 3 && x.r.every(Boolean); });
+    const allOk = (store, k, n) => Array.from({ length: n }, (_, i) => data[store][k] && data[store][k][slotKey(name, i)]).every(z => z && z.ok);
     const perfectDay = Object.keys(data.series).some(k => {
-      const x = g('series', k), r = g('riddles', k), a = g('adivi', k);
-      return x && x.i >= 3 && x.r.every(Boolean) && r && r.ok && a && a.ok;
+      const x = g('series', k);
+      return x && x.i >= 3 && x.r.every(Boolean) && allOk('riddles', k, STORY_SLOTS) && allOk('adivi', k, ADIVI_SLOTS);
     });
     const stt = data.stats[name] || {};
     return {
@@ -799,7 +860,7 @@
     { icon: '🤝', name: 'Touch',                desc: 'Sumá puntos 3 días seguidos.',                               cur: c => c.bestStreak, goal: 3 },
     { icon: '🎮', name: 'Gameboy',              desc: 'Acertá las 3 series de un mismo día.',                       cur: c => c.seriesOk, goal: 1 },
     { icon: '🔥', name: 'Gnarly',               desc: 'Trivia perfecta: todo bien en una partida de 10 o más en modo TODAS.', cur: c => c.perfect, goal: 1 },
-    { icon: '🤙', name: 'Pinky Up',             desc: 'Día perfecto: acertijo, adivinanza y las 3 series bien el mismo día.', cur: c => c.perfectDay, goal: 1 },
+    { icon: '🤙', name: 'Pinky Up',             desc: 'Día perfecto: todos los acertijos, todas las adivinanzas y las 3 series bien el mismo día.', cur: c => c.perfectDay, goal: 1 },
     { icon: '💃', name: 'Gabriela',             desc: 'Juntá 100 puntos en una semana.',                            cur: c => c.bestWeek, goal: 100 },
     { icon: '🎓', name: 'Dream Academy',        desc: 'Sumá puntos en 10 días distintos.',                          cur: c => c.activeDays, goal: 10 },
     { icon: '🌪️', name: 'Beautiful Chaos',      desc: 'Sumá puntos 7 días seguidos.',                               cur: c => c.bestStreak, goal: 7 },
@@ -807,6 +868,48 @@
     { icon: '👁️', name: 'Eyekon',               desc: 'Llegá a 500 puntos en total.',                               cur: c => c.total, goal: 500 },
     { icon: '👑', name: 'Eyekon de oro',        desc: 'Llegá a 1000 puntos en total.',                              cur: c => c.total, goal: 1000 }
   ];
+  // ---- Avisos de insignias nuevas ----
+  const toastQueue = []; let toasting = false;
+  function nextToast() {
+    const t = $('toast');
+    if (!toastQueue.length) { toasting = false; t.classList.add('hidden'); return; }
+    toasting = true;
+    const b = toastQueue.shift();
+    t.innerHTML = '<span class="ticon">' + b.icon + '</span><div><b>¡Nueva insignia!</b><br>' + esc(b.name) +
+      '<br><small>Tocá para ver tu colección</small></div>';
+    t.classList.remove('hidden');
+    t.style.animation = 'none'; void t.offsetWidth; t.style.animation = '';
+    clearTimeout(nextToast.timer);
+    nextToast.timer = setTimeout(nextToast, 5000);
+  }
+  $('toast').onclick = () => {
+    clearTimeout(nextToast.timer);
+    const inGame = !$('screen-game').classList.contains('hidden');
+    if (!inGame && actor) openCollection(actor);
+    nextToast();
+  };
+  function checkNewBadges(name) {
+    if (!data.players[name]) return;
+    const c = badgeCtx(name), earned = data.earned[name] = data.earned[name] || {};
+    const fresh = BADGES.filter(b => b.cur(c) >= b.goal && !(b.name in earned));
+    if (!fresh.length) return;
+    fresh.forEach(b => { earned[b.name] = ymd(new Date()); toastQueue.push(b); });
+    persist();
+    if (!toasting) nextToast();
+  }
+  // Al abrir la app: lo que ya estaba ganado se anota sin avisar (solo se avisa de lo nuevo)
+  function backfillEarned() {
+    Object.keys(data.players).forEach(n => {
+      if (data.earned[n]) return;
+      const c = badgeCtx(n); data.earned[n] = {};
+      BADGES.filter(b => b.cur(c) >= b.goal).forEach(b => { data.earned[n][b.name] = ''; });
+    });
+    persist();
+  }
+  function openCollection(name) {
+    renderBadgeGallery(name);
+    show('badges');
+  }
   const badgesOf = name => { const c = badgeCtx(name); return BADGES.filter(b => b.cur(c) >= b.goal).map(b => b.icon + ' ' + b.name); };
   function renderBadges(names) {
     $('report-badges').innerHTML = '<strong>Rachas e insignias</strong>' + names.map(n => {
@@ -815,8 +918,8 @@
         '<br><span class="hint" style="text-align:left;display:block">' + (b.length ? b.map(esc).join(' · ') : 'Todavía sin insignias: ¡a jugar!') + '</span></p>';
     }).join('');
   }
-  function renderBadgeGallery() {
-    const sel = $('badge-player'), prev = sel.value;
+  function renderBadgeGallery(pick) {
+    const sel = $('badge-player'), prev = typeof pick === 'string' ? pick : sel.value;
     const names = Object.keys(data.players);
     sel.innerHTML = names.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
     if (names.includes(prev)) sel.value = prev;
@@ -825,32 +928,40 @@
     const c = badgeCtx(name);
     const won = BADGES.filter(b => b.cur(c) >= b.goal).length;
     $('badge-summary').textContent = name + ': ' + won + ' de ' + BADGES.length + ' insignias';
-    $('badge-grid').innerHTML = BADGES.map(b => {
-      const cur = Math.min(b.cur(c), b.goal), ok = cur >= b.goal;
-      return '<div class="bcard ' + (ok ? 'won' : 'locked') + '"><div class="bicon">' + (ok ? b.icon : '🔒') + '</div>' +
+    const earnedMap = data.earned[name] || {}, today = ymd(new Date());
+    const fmt = k => k ? k.slice(8) + '/' + k.slice(5, 7) : '';
+    const list = BADGES.map(b => ({ b, cur: Math.min(b.cur(c), b.goal) })).sort((x, y) => (y.cur >= y.b.goal) - (x.cur >= x.b.goal));
+    $('badge-grid').innerHTML = list.map(({ b, cur }) => {
+      const ok = cur >= b.goal, d = earnedMap[b.name];
+      return '<div class="bcard ' + (ok ? 'won' : 'locked') + '">' + (ok && d === today ? '<div class="new">¡NUEVA!</div>' : '') +
+        '<div class="bicon">' + (ok ? b.icon : '🔒') + '</div>' +
         '<div class="bname">' + esc(b.name) + '</div><div class="bdesc">' + esc(b.desc) + '</div>' +
         '<div class="bbar"><i style="width:' + Math.round(cur / b.goal * 100) + '%"></i></div>' +
-        '<div class="hint" style="margin-top:2px">' + (ok ? '¡Ganada! 🎉' : cur + ' / ' + b.goal) + '</div></div>';
+        '<div class="hint" style="margin-top:2px">' + (ok ? '¡Ganada!' + (d ? ' · ' + fmt(d) : '') + ' 🎉' : cur + ' / ' + b.goal) + '</div></div>';
     }).join('');
   }
   $('btn-badges').onclick = () => { renderBadgeGallery(); show('badges'); };
+  $('btn-res-badges').onclick = () => openCollection(player);
   $('badge-player').onchange = renderBadgeGallery;
 
   function renderDaily() {
-    const item = todayItem();
-    $('story-title').textContent = item.t;
-    $('story-text').textContent = item.s;
+    for (let k = 0; k < STORY_SLOTS; k++) {
+      const item = todayItem(k);
+      $('story-title-' + k).textContent = item.t;
+      $('story-text-' + k).textContent = item.s;
+    }
     const sel = $('riddle-player'), prev = sel.value;
     const names = Object.keys(data.players);
     sel.innerHTML = names.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
     if (names.includes(prev)) sel.value = prev;
-    riddleGame.render();
-    adiviGame.render();
+    riddleGames.forEach(g => g.render());
+    adiviGames.forEach(g => g.render());
     serieGame.render();
   }
   $('riddle-player').onchange = () => {
-    $('riddle-answer').value = ''; $('adivi-answer').value = ''; $('serie-answer').value = '';
-    riddleGame.update(); adiviGame.update(); serieGame.update();
+    $('serie-answer').value = '';
+    riddleGames.concat(adiviGames).forEach(g => { g.clear(); g.update(); });
+    serieGame.update();
   };
 
   /* ---------- Instalar como app (PWA) ---------- */
@@ -882,6 +993,7 @@
     $('install-box').classList.add('hidden');
   };
 
+  backfillEarned();
   renderPlayers();
   show('home');
 })();
