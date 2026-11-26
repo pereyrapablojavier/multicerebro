@@ -80,6 +80,29 @@
   .daily-h { margin: 0 0 6px; }
   .riddle-q { font-size: 1.15rem; font-weight: bold; margin: 6px 0 12px; }
   .badge { background: var(--accent); color: #3a2a00; border-radius: 999px; padding: 2px 10px; font-size: .85rem; vertical-align: middle; }
+  .steps { display: flex; align-items: center; justify-content: center; gap: 0; margin: 10px 0 14px; }
+  .step { width: 64px; text-align: center; border-radius: 14px; padding: 6px 0; background: #eef0fb; color: var(--muted); transition: all .2s; }
+  .step b { display: block; font-size: 1.2rem; line-height: 1.3; }
+  .step small { font-size: .7rem; }
+  .step.current { background: var(--primary); color: #fff; transform: scale(1.18); box-shadow: 0 4px 12px rgba(67,97,238,.45); }
+  .step.ok { background: var(--good); color: #fff; }
+  .step.bad { background: var(--bad); color: #fff; }
+  .step-line { width: 18px; height: 4px; background: #dfe3f6; border-radius: 2px; }
+  .terms { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 6px 0 12px; }
+  .term { min-width: 52px; padding: 10px 12px; border-radius: 12px; background: #f1f3ff; color: var(--ink); font-size: 1.4rem; font-weight: bold; text-align: center; }
+  .term.q { background: var(--accent); color: #3a2a00; animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+  .serie-done { text-align: center; font-weight: bold; color: var(--good); }
+  .badge-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+  .bcard { border-radius: 16px; padding: 12px 8px; text-align: center; background: #f6f7ff; border: 3px solid transparent; }
+  .bcard .bicon { font-size: 2.2rem; line-height: 1.2; }
+  .bcard .bname { font-weight: bold; margin: 2px 0; font-size: .98rem; }
+  .bcard .bdesc { font-size: .8rem; color: var(--muted); min-height: 3.2em; }
+  .bcard .bbar { height: 8px; background: #e3e6f7; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .bcard .bbar > i { display: block; height: 100%; background: var(--primary); }
+  .bcard.locked { filter: grayscale(1); opacity: .6; }
+  .bcard.won { background: #fff7d6; border-color: var(--accent); }
+  .bcard.won .bbar > i { background: var(--good); }
   .pop { animation: pop .35s; }
   @keyframes pop { 0% { transform: scale(.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 </style>
@@ -97,7 +120,8 @@
       <button id="btn-add" style="flex:0 0 auto">Agregar</button>
     </div>
     <div style="margin-top:16px; text-align:center">
-      <button class="secondary" id="btn-report">📊 Ver puntos de la semana</button>
+      <button class="secondary" id="btn-report">📊 Puntos de la semana</button>
+      <button class="secondary" id="btn-badges" style="margin-top:8px">🏆 Insignias</button>
     </div>
     <div id="install-box" class="hidden" style="margin-top:16px; text-align:center">
       <button id="btn-install" class="hidden" style="background:var(--good)">📲 Instalar en el celular</button>
@@ -130,7 +154,7 @@
     <div class="feedback" id="adivi-fb"></div>
     <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
     <h2 class="daily-h">🔗 Completá la serie <span class="badge">+1 punto cada una</span></h2>
-    <p class="riddle-q" id="serie-q" style="letter-spacing:1px"></p>
+    <div id="serie-q"></div>
     <form id="serie-form" class="answer-row" autocomplete="off">
       <input type="number" id="serie-answer" inputmode="numeric" placeholder="?" required>
       <button type="submit" id="serie-btn" style="flex:0 0 auto">Responder</button>
@@ -189,6 +213,18 @@
     </div>
   </section>
 
+  <!-- Pantalla 6: galería de insignias -->
+  <section id="screen-badges" class="card hidden">
+    <div class="topbar">
+      <strong>🏆 Insignias</strong>
+      <button class="ghost" data-back>← Volver</button>
+    </div>
+    <p class="hint" style="text-align:left">Inspiradas en KATSEYE, el grupo global de HYBE × Geffen. App no oficial. ¡Ganalas jugando!</p>
+    <select id="badge-player"></select>
+    <p class="hint" id="badge-summary"></p>
+    <div class="badge-grid" id="badge-grid"></div>
+  </section>
+
   <!-- Pantalla 5: reporte semanal -->
   <section id="screen-report" class="card hidden">
     <div class="topbar">
@@ -214,7 +250,7 @@
 
   /* ---------- Almacenamiento: cookie local (con respaldo en localStorage) ---------- */
   const KEY = 'tablas_v1';
-  const emptyData = () => ({ players: {}, riddles: {}, adivi: {}, series: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
+  const emptyData = () => ({ players: {}, riddles: {}, adivi: {}, series: {}, stats: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
 
   function readCookie() {
     const m = document.cookie.split('; ').find(c => c.startsWith(KEY + '='));
@@ -233,6 +269,7 @@
     d.riddles = d.riddles || {};
     d.adivi = d.adivi || {};
     d.series = d.series || {};
+    d.stats = d.stats || {};
     return d;
   }
   function save() {
@@ -242,7 +279,7 @@
   }
   function trimmed(d, days) {
     const limit = ymd(addDays(new Date(), -days));
-    const out = { players: {}, riddles: {}, adivi: {}, series: {} };
+    const out = { players: {}, riddles: {}, adivi: {}, series: {}, stats: d.stats || {} };
     for (const k of ['riddles', 'adivi', 'series'])
       for (const [day, byName] of Object.entries(d[k] || {})) if (day >= limit) out[k][day] = byName;
     for (const [name, byDay] of Object.entries(d.players)) {
@@ -274,7 +311,7 @@
 
   /* ---------- Utilidades de UI ---------- */
   const $ = id => document.getElementById(id);
-  const screens = ['home', 'setup', 'game', 'result', 'report'];
+  const screens = ['home', 'setup', 'game', 'result', 'report', 'badges'];
   function show(name) {
     screens.forEach(s => $('screen-' + s).classList.toggle('hidden', s !== name));
     $('screen-daily').classList.toggle('hidden', name !== 'home');
@@ -472,6 +509,12 @@
   }
 
   function finish() {
+    if (!game.quit) {
+      const st = data.stats[player] = data.stats[player] || { games: 0, all: 0, prac: 0, perfect: 0 };
+      st.games++;
+      if (cfg.scoring) { st.all++; if (cfg.n >= 10 && game.correct === cfg.n) st.perfect++; } else st.prac++;
+      save();
+    }
     show('result');
     $('res-correct').textContent = game.correct;
     $('res-total').textContent = cfg.n;
@@ -483,7 +526,7 @@
 
   $('btn-start').onclick = startGame;
   $('btn-again').onclick = () => show('setup');
-  $('btn-quit').onclick = () => { if (confirm('¿Terminar ahora?')) { game.i = cfg.n; if (game.q) game.q.answered = true; finish(); } };
+  $('btn-quit').onclick = () => { if (confirm('¿Terminar ahora?')) { game.quit = true; game.i = cfg.n; if (game.q) game.q.answered = true; finish(); } };
 
   /* ---------- Reporte semanal ---------- */
   let reportMonday = mondayOf(new Date());
@@ -660,6 +703,16 @@
     for (let i = idx.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
     return idx.slice(0, 3).map(k => { const t = SERIE_TYPES[k](r); return { shown: t.slice(0, -1), ans: t[t.length - 1] }; });
   }
+  function stepsHtml(st, n) {
+    let h = '<div class="steps">';
+    for (let i = 0; i < n; i++) {
+      const cls = i < st.i ? (st.r[i] ? 'ok' : 'bad') : (i === st.i ? 'current' : '');
+      const label = i < st.i ? (st.r[i] ? '✓' : '✗') : (i + 1);
+      h += '<div class="step ' + cls + '"><b>' + label + '</b><small>Serie ' + (i + 1) + ' de ' + n + '</small></div>';
+      if (i < n - 1) h += '<span class="step-line"></span>';
+    }
+    return h + '</div>';
+  }
   const serieGame = (function () {
     const $q = $('serie-q'), $a = $('serie-answer'), $b = $('serie-btn'), $fb = $('serie-fb');
     const state = name => { const d = data.series[ymd(new Date())]; return (d && d[name]) || { i: 0, r: [] }; };
@@ -670,13 +723,13 @@
       const st = state(name), list = todaySeries();
       if (st.i >= list.length) {
         const k = st.r.filter(Boolean).length;
-        off(true); $q.textContent = '✅ Series de hoy completas';
+        off(true); $q.innerHTML = stepsHtml(st, list.length) + '<div class="serie-done">✅ Series de hoy completas</div>';
         $fb.className = 'feedback ' + (msg ? cls : 'good');
         $fb.textContent = (msg || '') + 'Acertaste ' + k + ' de ' + list.length + ' (+' + k + (k === 1 ? ' punto' : ' puntos') + ')';
         return;
       }
       off(false);
-      $q.textContent = 'Serie ' + (st.i + 1) + ' de ' + list.length + ': ' + list[st.i].shown.join(', ') + ', ?';
+      $q.innerHTML = stepsHtml(st, list.length) + '<div class="terms">' + list[st.i].shown.map(v => '<span class="term">' + v + '</span>').join('') + '<span class="term q">?</span></div>';
       $fb.className = 'feedback ' + (msg ? cls : '');
       $fb.textContent = msg || '';
     }
@@ -709,29 +762,79 @@
     while (ptsOn(name, d) > 0 && n < 400) { n++; d = addDays(d, -1); }
     return n;
   }
-  function badgesOf(name) {
-    const out = [], st = streak(name);
-    const week = weekTotal(name, mondayOf(new Date()));
-    const total = Object.values(data.players[name] || {}).reduce((a, b) => a + b, 0);
-    if (st >= 3) out.push('🔥 Constante (' + st + ' días seguidos)');
-    if (st >= 7) out.push('🚀 Imparable (7 días seguidos)');
-    if (week >= 50) out.push('⭐ 50 puntos en la semana');
-    if (week >= 100) out.push('🌟 100 puntos en la semana');
-    if (week >= 200) out.push('🏅 Súper semana: 200 puntos');
-    if (total >= 500) out.push('🧠 Mente brillante: 500 puntos en total');
-    const day = ymd(new Date());
-    const g = (k) => data[k][day] && data[k][day][name];
-    if (g('riddles') && g('riddles').ok && g('adivi') && g('adivi').ok && g('series') && g('series').i >= 3 && g('series').r.every(Boolean))
-      out.push('🎯 Día perfecto: todo bien en las actividades de hoy');
-    return out;
+  const parseDay = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+  // Todo lo que se necesita para decidir qué insignias ganó un jugador
+  function badgeCtx(name) {
+    const byDay = data.players[name] || {};
+    const days = Object.keys(byDay).filter(k => byDay[k] > 0).sort();
+    let best = 0, run = 0, prev = null;
+    days.forEach(k => {
+      const cur = parseDay(k);
+      run = (prev && Math.round((cur - prev) / 86400000) === 1) ? run + 1 : 1;
+      best = Math.max(best, run); prev = cur;
+    });
+    const weeks = {};
+    days.forEach(k => { const m = ymd(mondayOf(parseDay(k))); weeks[m] = (weeks[m] || 0) + byDay[k]; });
+    const g = (store, k) => (data[store][k] && data[store][k][name]) || null;
+    const seriesOk = Object.keys(data.series).some(k => { const x = g('series', k); return x && x.i >= 3 && x.r.every(Boolean); });
+    const perfectDay = Object.keys(data.series).some(k => {
+      const x = g('series', k), r = g('riddles', k), a = g('adivi', k);
+      return x && x.i >= 3 && x.r.every(Boolean) && r && r.ok && a && a.ok;
+    });
+    const stt = data.stats[name] || {};
+    return {
+      total: Object.values(byDay).reduce((x, y) => x + y, 0),
+      activeDays: days.length, bestStreak: best,
+      bestWeek: Math.max(0, ...Object.values(weeks)),
+      games: stt.games || 0, perfect: stt.perfect || 0,
+      modes: (stt.all > 0 ? 1 : 0) + (stt.prac > 0 ? 1 : 0),
+      seriesOk: seriesOk ? 1 : 0, perfectDay: perfectDay ? 1 : 0
+    };
   }
+  // Insignias inspiradas en KATSEYE (nombres de canciones/EP y de su mundo; sin letras ni imágenes)
+  const BADGES = [
+    { icon: '🎤', name: 'Debut',                desc: 'Conseguí tu primer punto.',                                  cur: c => Math.min(c.total, 1), goal: 1 },
+    { icon: '✨', name: 'SIS (Soft Is Strong)', desc: 'Jugá 5 partidas de trivia en total.',                        cur: c => c.games, goal: 5 },
+    { icon: '🐱', name: 'Ojo de gato',          desc: 'Jugá en modo TODAS y también en Elegir tablas: como la piedra, cambia de color según cómo la mires.', cur: c => c.modes, goal: 2 },
+    { icon: '🤝', name: 'Touch',                desc: 'Sumá puntos 3 días seguidos.',                               cur: c => c.bestStreak, goal: 3 },
+    { icon: '🎮', name: 'Gameboy',              desc: 'Acertá las 3 series de un mismo día.',                       cur: c => c.seriesOk, goal: 1 },
+    { icon: '🔥', name: 'Gnarly',               desc: 'Trivia perfecta: todo bien en una partida de 10 o más en modo TODAS.', cur: c => c.perfect, goal: 1 },
+    { icon: '🤙', name: 'Pinky Up',             desc: 'Día perfecto: acertijo, adivinanza y las 3 series bien el mismo día.', cur: c => c.perfectDay, goal: 1 },
+    { icon: '💃', name: 'Gabriela',             desc: 'Juntá 100 puntos en una semana.',                            cur: c => c.bestWeek, goal: 100 },
+    { icon: '🎓', name: 'Dream Academy',        desc: 'Sumá puntos en 10 días distintos.',                          cur: c => c.activeDays, goal: 10 },
+    { icon: '🌪️', name: 'Beautiful Chaos',      desc: 'Sumá puntos 7 días seguidos.',                               cur: c => c.bestStreak, goal: 7 },
+    { icon: '🐾', name: 'WILD',                 desc: 'Juntá 200 puntos en una semana.',                            cur: c => c.bestWeek, goal: 200 },
+    { icon: '👁️', name: 'Eyekon',               desc: 'Llegá a 500 puntos en total.',                               cur: c => c.total, goal: 500 },
+    { icon: '👑', name: 'Eyekon de oro',        desc: 'Llegá a 1000 puntos en total.',                              cur: c => c.total, goal: 1000 }
+  ];
+  const badgesOf = name => { const c = badgeCtx(name); return BADGES.filter(b => b.cur(c) >= b.goal).map(b => b.icon + ' ' + b.name); };
   function renderBadges(names) {
     $('report-badges').innerHTML = '<strong>Rachas e insignias</strong>' + names.map(n => {
       const st = streak(n), b = badgesOf(n);
       return '<p style="margin:8px 0">🧒 <strong>' + esc(n) + '</strong> · 🔥 ' + st + (st === 1 ? ' día' : ' días') + ' seguidos' +
-        (b.length ? '<br><span class="hint" style="text-align:left;display:block">' + b.map(esc).join('<br>') + '</span>' : '') + '</p>';
+        '<br><span class="hint" style="text-align:left;display:block">' + (b.length ? b.map(esc).join(' · ') : 'Todavía sin insignias: ¡a jugar!') + '</span></p>';
     }).join('');
   }
+  function renderBadgeGallery() {
+    const sel = $('badge-player'), prev = sel.value;
+    const names = Object.keys(data.players);
+    sel.innerHTML = names.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
+    if (names.includes(prev)) sel.value = prev;
+    const name = sel.value;
+    if (!name) { $('badge-summary').textContent = 'Agregá un jugador para ver sus insignias.'; $('badge-grid').innerHTML = ''; return; }
+    const c = badgeCtx(name);
+    const won = BADGES.filter(b => b.cur(c) >= b.goal).length;
+    $('badge-summary').textContent = name + ': ' + won + ' de ' + BADGES.length + ' insignias';
+    $('badge-grid').innerHTML = BADGES.map(b => {
+      const cur = Math.min(b.cur(c), b.goal), ok = cur >= b.goal;
+      return '<div class="bcard ' + (ok ? 'won' : 'locked') + '"><div class="bicon">' + (ok ? b.icon : '🔒') + '</div>' +
+        '<div class="bname">' + esc(b.name) + '</div><div class="bdesc">' + esc(b.desc) + '</div>' +
+        '<div class="bbar"><i style="width:' + Math.round(cur / b.goal * 100) + '%"></i></div>' +
+        '<div class="hint" style="margin-top:2px">' + (ok ? '¡Ganada! 🎉' : cur + ' / ' + b.goal) + '</div></div>';
+    }).join('');
+  }
+  $('btn-badges').onclick = () => { renderBadgeGallery(); show('badges'); };
+  $('badge-player').onchange = renderBadgeGallery;
 
   function renderDaily() {
     const item = todayItem();
