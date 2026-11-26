@@ -83,16 +83,26 @@
   .daily-h { margin: 0 0 6px; }
   .riddle-q { font-size: 1.15rem; font-weight: bold; margin: 6px 0 12px; }
   .badge { background: var(--accent); color: #3a2a00; border-radius: 999px; padding: 2px 10px; font-size: .85rem; vertical-align: middle; }
+  .daily-h .badge { display: block; width: fit-content; margin-top: 6px; font-size: .9rem; }
+  .serie-box { background: #f6f7ff; border-radius: 20px; padding: 18px 14px; margin: 0 -4px; }
+  .serie-box .daily-h { font-size: 1.4rem; }
+  .serie-box .answer-row input { font-size: 2rem; padding: 14px; }
+  .serie-box .answer-row button { font-size: 1.15rem; padding: 14px 20px; }
+  .serie-box .feedback { font-size: 1.25rem; }
+  @media (max-width: 480px) {
+    body { padding: 8px; }
+    .card { padding: 16px 14px; }
+  }
   .steps { display: flex; align-items: center; justify-content: center; gap: 0; margin: 10px 0 14px; }
-  .step { width: 64px; text-align: center; border-radius: 14px; padding: 6px 0; background: #eef0fb; color: var(--muted); transition: all .2s; }
-  .step b { display: block; font-size: 1.2rem; line-height: 1.3; }
-  .step small { font-size: .7rem; }
-  .step.current { background: var(--primary); color: #fff; transform: scale(1.18); box-shadow: 0 4px 12px rgba(67,97,238,.45); }
+  .step { flex: 1 1 0; max-width: 104px; text-align: center; border-radius: 16px; padding: 10px 4px; background: #eef0fb; color: var(--muted); transition: all .2s; }
+  .step b { display: block; font-size: 1.8rem; line-height: 1.2; }
+  .step small { font-size: .95rem; font-weight: bold; }
+  .step.current { background: var(--primary); color: #fff; transform: scale(1.08); box-shadow: 0 4px 12px rgba(67,97,238,.45); }
   .step.ok { background: var(--good); color: #fff; }
   .step.bad { background: var(--bad); color: #fff; }
-  .step-line { width: 18px; height: 4px; background: #dfe3f6; border-radius: 2px; }
-  .terms { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 6px 0 12px; }
-  .term { min-width: 52px; padding: 10px 12px; border-radius: 12px; background: #f1f3ff; color: var(--ink); font-size: 1.4rem; font-weight: bold; text-align: center; }
+  .step-line { flex: 0 0 12px; height: 4px; background: #dfe3f6; border-radius: 2px; }
+  .terms { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: 10px 0 16px; }
+  .term { min-width: 64px; padding: 14px 14px; border-radius: 14px; background: #fff; color: var(--ink); font-size: clamp(1.6rem, 8vw, 2.2rem); box-shadow: 0 2px 6px rgba(0,0,0,.08); font-weight: bold; text-align: center; }
   .term.q { background: var(--accent); color: #3a2a00; animation: pulse 1.4s infinite; }
   @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
   .serie-done { text-align: center; font-weight: bold; color: var(--good); }
@@ -145,13 +155,15 @@
     <select id="riddle-player"></select>
     <div id="stories-box"></div>
     <div id="adivi-box"></div>
-    <h2 class="daily-h">🔗 Completá la serie <span class="badge">+1 punto cada una</span></h2>
+<div class="serie-box">
+    <h2 class="daily-h">🔗 Completá la serie <span class="badge">+1 punto por serie</span></h2>
     <div id="serie-q"></div>
     <form id="serie-form" class="answer-row" autocomplete="off">
       <input type="number" id="serie-answer" inputmode="numeric" placeholder="?" required>
       <button type="submit" id="serie-btn" style="flex:0 0 auto">Responder</button>
     </form>
     <div class="feedback" id="serie-fb"></div>
+    </div>
   </section>
 
   <!-- Pantalla 2: configurar partida -->
@@ -775,7 +787,7 @@
     for (let i = 0; i < n; i++) {
       const cls = i < st.i ? (st.r[i] ? 'ok' : 'bad') : (i === st.i ? 'current' : '');
       const label = i < st.i ? (st.r[i] ? '✓' : '✗') : (i + 1);
-      h += '<div class="step ' + cls + '"><b>' + label + '</b><small>Serie ' + (i + 1) + ' de ' + n + '</small></div>';
+      h += '<div class="step ' + cls + '"><b>' + label + '</b><small>Serie ' + (i + 1) + '</small></div>';
       if (i < n - 1) h += '<span class="step-line"></span>';
     }
     return h + '</div>';
