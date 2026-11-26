@@ -121,7 +121,7 @@
     </form>
     <div class="feedback" id="riddle-fb"></div>
     <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
-    <h2 class="daily-h">🔢 ¿Qué número soy? <span class="badge">+1 punto</span></h2>
+    <h2 class="daily-h">🔢 Adivinanza de números <span class="badge">+1 punto</span></h2>
     <p class="riddle-q" id="adivi-q"></p>
     <form id="adivi-form" class="answer-row" autocomplete="off">
       <input type="number" id="adivi-answer" inputmode="numeric" placeholder="?" required>
@@ -500,39 +500,39 @@
   /* ---------- Historia y acertijo del día ---------- */
   // Cada día toca un par distinto (historia + acertijo que se resuelve con lo que leyeron).
   const DAILY = [
-    { t: 'El truco de Gauss', s: 'Se cuenta que, de chico, Carl Gauss sumó los números del 1 al 10 en un instante. Juntó los extremos en parejas: 1+10, 2+9, 3+8, 4+7 y 5+6. ¡Todas las parejas dan 11!', q: 'Hay 5 parejas y cada una suma 11. ¿Cuánto es 5 × 11, o sea, 1+2+3+…+10?', a: 55 },
-    { t: 'Las abejas y sus patas', s: 'Las abejas son insectos, y todos los insectos tienen 6 patas. Cuando una abeja se posa en una flor, usa sus patitas para juntar el polen.', q: 'En una flor hay 7 abejas. ¿Cuántas patas hay en total?', a: 42 },
-    { t: 'El tablero de ajedrez', s: 'El tablero de ajedrez tiene 8 filas y en cada fila hay 8 casillas, alternando blancas y negras. Hace más de mil años que la gente juega en tableros como este.', q: '¿Cuántas casillas tiene un tablero de ajedrez? (8 × 8)', a: 64 },
-    { t: 'La araña tejedora', s: 'La araña no es un insecto: tiene 8 patas, no 6. Con ellas teje su tela, hilo por hilo, y la usa para atrapar moscas.', q: 'En el jardín hay 7 arañas. ¿Cuántas patas tienen entre todas?', a: 56 },
-    { t: 'Por qué la hora tiene 60 minutos', s: 'Hace mucho tiempo, en Babilonia, contaban de a 60. Por eso el reloj tiene 12 números y entre un número y el siguiente pasan 5 minutos.', q: 'El reloj tiene 12 números y entre cada uno pasan 5 minutos. ¿Cuántos minutos tarda en dar una vuelta completa?', a: 60 },
-    { t: 'El cubo que da vueltas', s: 'El cubo de Rubik tiene 6 caras, cada una de un color. En cada cara hay 3 filas de 3 cuadraditos, o sea 9 cuadraditos por cara.', q: '¿Cuántos cuadraditos de color tiene el cubo en total? (6 × 9)', a: 54 },
-    { t: 'El truco mágico del 9', s: 'Los resultados de la tabla del 9 guardan un secreto: sumá sus cifras y siempre te da 9. Mirá: 9 × 3 = 27 y 2 + 7 = 9. ¡Probalo con otros!', q: '¿Cuánto es 9 × 8? (Comprobá que sus cifras suman 9)', a: 72 },
-    { t: 'Contar con los dedos', s: 'Contamos de a 10 porque tenemos 10 dedos en las manos. Mucho antes de las calculadoras, la gente multiplicaba y sumaba usando los dedos.', q: 'En la plaza hay 7 amigos levantando las manos. ¿Cuántos dedos hay en total?', a: 70 },
-    { t: 'La docena', s: 'Una docena son 12 cosas. Se usa mucho para vender huevos, medialunas o empanadas. Por ejemplo, media docena son 6.', q: 'Mamá compró 4 docenas de empanadas. ¿Cuántas empanadas son?', a: 48 },
-    { t: 'La pizza compartida', s: 'Una pizza grande suele cortarse en 8 porciones. Si todos se llevan la misma cantidad, nadie se enoja y las cuentas son fáciles.', q: 'En una fiesta piden 5 pizzas. ¿Cuántas porciones hay en total?', a: 40 },
-    { t: 'El trébol de la suerte', s: 'Los tréboles casi siempre tienen 3 hojas, pero a veces aparece uno con 4 hojas. Dicen que quien encuentra uno tiene suerte, aunque es muy difícil de ver.', q: 'Encontraste 9 tréboles de 4 hojas. ¿Cuántas hojas hay en total?', a: 36 },
-    { t: 'Los dados', s: 'Un dado es un cubo y por eso tiene 6 caras. Cada cara tiene de 1 a 6 puntitos, y las caras opuestas siempre suman 7.', q: 'En una mesa hay 11 dados. ¿Cuántas caras hay en total?', a: 66 },
-    { t: 'El equipo de fútbol', s: 'Un equipo de fútbol juega con 11 jugadores en la cancha: 10 jugadores de campo y 1 arquero. ¡Hay que ponerse de acuerdo entre todos!', q: 'En un torneo juegan 9 equipos. ¿Cuántos jugadores hay en total, contando 11 por equipo?', a: 99 },
-    { t: 'El pulpo y sus brazos', s: 'El pulpo tiene 8 brazos llenos de ventosas, y con ellos puede agarrar cosas, caminar por el fondo del mar y hasta abrir frascos.', q: 'En el acuario hay 4 pulpos. ¿Cuántos brazos tienen entre todos?', a: 32 },
-    { t: 'La semana tiene 7 días', s: 'Lunes, martes, miércoles, jueves, viernes, sábado y domingo: la semana tiene 7 días. Los días de la semana se repiten una y otra vez, como una tabla de multiplicar.', q: 'Faltan 9 semanas para las vacaciones. ¿Cuántos días son?', a: 63 }
+    { t: "El truco de Gauss", s: "Se cuenta que, siendo chico, Carl Gauss sumó los números del 1 al 100 en segundos. Juntó los extremos en parejas: 1+100, 2+99, 3+98… ¡y todas dan 101! Como hay 50 parejas, la suma es 50 × 101 = 5050.", q: "Usá el truco de Gauss: ¿cuánto suman los números del 1 al 20? (Pista: mirá cuántas parejas salen y cuánto suma cada una.)", a: 210 },
+    { t: "Insectos y arañas", s: "Los insectos, como las hormigas, tienen 6 patas. Las arañas no son insectos: tienen 8 patas. Es una de las diferencias que usan los científicos para clasificarlos.", q: "En un frasco hay 8 hormigas y 5 arañas. ¿Cuántas patas hay en total?", a: 88 },
+    { t: "El inventor del ajedrez", s: "Cuenta una leyenda que el inventor del ajedrez le pidió al rey un premio en granos de arroz: 1 grano en la primera casilla, 2 en la segunda, 4 en la tercera, y así, duplicando en cada casilla. ¡El rey no pudo pagarlo!", q: "Siguiendo la leyenda (1, 2, 4, 8…), ¿cuántos granos de arroz hay que poner en la casilla número 8?", a: 128 },
+    { t: "Por qué la hora tiene 60 minutos", s: "Hace unos 4.000 años, en Babilonia, contaban de a 60. Elegían el 60 porque se puede dividir en partes iguales de muchas formas: entre 2, 3, 4, 5, 6, 10, 12, 15, 20 y 30.", q: "Una película dura 2 horas y 15 minutos. ¿Cuántos minutos dura?", a: 135 },
+    { t: "El cubo de Rubik", s: "El cubo de Rubik tiene 8 esquinas y en cada una se ven 3 cuadraditos de color. También tiene 12 aristas (las piezas del borde) y en cada una se ven 2 colores. Y en el centro de cada cara hay 1 cuadradito fijo.", q: "¿Cuántos cuadraditos de color hay en las 8 esquinas y las 12 aristas juntas?", a: 48 },
+    { t: "El truco del 9", s: "Para multiplicar por 9 hay un truco: multiplicá por 10 y restá el número. Por ejemplo, 9 × 4 = 40 − 4 = 36. Además, las cifras de los resultados de la tabla del 9 siempre suman 9: 36 → 3 + 6 = 9.", q: "Usá el truco: ¿cuánto es 9 × 13?", a: 117 },
+    { t: "El truco de los dedos", s: "Hay un truco para multiplicar del 6 al 9 con los dedos. Para 7 × 8: levantás 2 dedos (7 − 5) en una mano y 3 (8 − 5) en la otra. Los levantados suman 5 y son las decenas. Los bajados son 3 y 2, se multiplican (3 × 2 = 6) y son las unidades. ¡Resultado: 56!", q: "Usá el truco de los dedos para calcular 7 × 9.", a: 63 },
+    { t: "La gruesa y la docena", s: "Una docena son 12 cosas. Pero en las fábricas de lápices se usaba una unidad más grande: la gruesa, que son 12 docenas. Una gruesa es 12 × 12 = 144 lápices.", q: "Una fábrica envía 2 gruesas de lápices. ¿Cuántos lápices son?", a: 288 },
+    { t: "La pizza de la fiesta", s: "Las pizzas italianas suelen cortarse en 8 porciones. Cuando hay muchos invitados, los cocineros calculan cuántas porciones comerá cada uno para saber cuántas pizzas pedir.", q: "En una fiesta hay 6 pizzas de 8 porciones. Cada uno de los 12 chicos come 3 porciones. ¿Cuántas porciones sobran?", a: 12 },
+    { t: "El panal de miel", s: "Las abejas construyen celdas con forma de hexágono, que tienen 6 lados. Es la forma que aprovecha mejor el espacio sin dejar huecos, y en cada celda guardan miel.", q: "Una colmena tiene 12 panales de 7 celdas cada uno. Si cada celda guarda 6 gotas de miel, ¿cuántas gotas hay en total?", a: 504 },
+    { t: "Los dados", s: "En un dado, las caras opuestas siempre suman 7: 1 con 6, 2 con 5 y 3 con 4. Como hay 3 pares de caras opuestas, todas las caras de un dado suman 3 × 7 = 21.", q: "Con 8 dados, ¿cuánto suman todas sus caras en total?", a: 168 },
+    { t: "El torneo de fútbol", s: "En un partido de fútbol juegan 11 jugadores por equipo. Pero cada equipo también lleva suplentes, que esperan en el banco por si hay un cambio.", q: "En un torneo hay 8 equipos. Cada uno tiene 11 titulares y 7 suplentes. ¿Cuántos jugadores hay en total?", a: 144 },
+    { t: "El pulpo y sus corazones", s: "El pulpo tiene 8 brazos, pero eso no es lo más raro: ¡también tiene 3 corazones! Dos bombean sangre a las branquias y el tercero al resto del cuerpo.", q: "En un acuario hay 6 pulpos. ¿Cuántos brazos y corazones hay en total, contando juntos?", a: 66 },
+    { t: "El año tiene un día de sobra", s: "Una semana tiene 7 días y un año tiene 52 semanas completas. Pero 52 × 7 no alcanza para llenar un año: siempre sobra 1 día. ¡Por eso las fechas caen en un día de la semana distinto cada año!", q: "Un año común, ¿cuántos días tiene? (52 semanas y el día que sobra.)", a: 365 },
+    { t: "Cuadrados de puntitos", s: "Si ponés puntitos formando un cuadrado, la cantidad total es el lado por el lado: 12 × 12 = 144. Para pasar al cuadrado siguiente, 13 × 13, solo hay que sumarle 12 + 13 al cuadrado anterior.", q: "Usando el truco, ¿cuánto es 13 × 13?", a: 169 }
   ];
-  // Adivinanzas "¿Qué número soy?" (una por día, distinta rotación que el acertijo)
+  // Adivinanzas de números (una por día, distinta rotación que el acertijo)
   const ADIVI = [
-    { q: 'Soy redondo como una pelota. Si me ponés a la derecha de otro número lo hago diez veces más grande, pero solo, no valgo nada. ¿Qué número soy?', a: 0 },
-    { q: 'Soy el primero de todos cuando se cuenta y el más chiquito de los que contás. ¿Qué número soy?', a: 1 },
-    { q: 'Estoy entre el uno y el tres. Si me sumás conmigo mismo, me convierto en cuatro. ¿Qué número soy?', a: 2 },
-    { q: 'Parezco dos ruedas, una arriba de la otra. Si me acostás, me parezco al signo del infinito. ¿Qué número soy?', a: 8 },
-    { q: 'Soy la cantidad de patas que tiene una hormiga. ¿Qué número soy?', a: 6 },
-    { q: 'Soy una docena: con mis cosas se cuentan los meses del año y los números del reloj. ¿Qué número soy?', a: 12 },
-    { q: 'Si me multiplicás por mí mismo, te doy 25. ¿Qué número soy?', a: 5 },
-    { q: 'Un gusano está en el fondo de un pozo de 12 metros. Cada día sube 4 metros y cada noche resbala 1. ¿En cuántos días logra salir?', a: 4 },
-    { q: 'Si me sumás 5, llegás a 20. ¿Qué número soy?', a: 15 },
-    { q: 'Soy el doble de 7. ¿Qué número soy?', a: 14 },
-    { q: 'Soy el resultado de 7 × 7. ¿Qué número soy?', a: 49 },
-    { q: 'Me escribo igual al derecho que al revés, y soy la cantidad de jugadores de un equipo de fútbol. ¿Qué número soy?', a: 11 },
-    { q: 'Soy un número par y estoy justo entre el 9 y el 11. ¿Qué número soy?', a: 10 },
-    { q: 'Soy el triple de 9. ¿Qué número soy?', a: 27 },
-    { q: 'Soy la mitad de 100. ¿Qué número soy?', a: 50 }
+    { q: "Soy un número de dos cifras. Mis cifras suman 9 y la cifra de las decenas es el doble que la de las unidades. ¿Qué número soy?", a: 63 },
+    { q: "Si me multiplicás por 6 y después le sumás 4, llegás a 52. ¿Qué número soy?", a: 8 },
+    { q: "Soy múltiplo de 7 y también de 4, y estoy entre 20 y 40. ¿Qué número soy?", a: 28 },
+    { q: "Soy un cuadrado perfecto (un número multiplicado por sí mismo) y estoy entre 60 y 70. ¿Qué número soy?", a: 64 },
+    { q: "Un gusano está en el fondo de un pozo de 20 metros. Cada día sube 5 metros y cada noche resbala 2. ¿En cuántos días logra salir?", a: 6 },
+    { q: "Si me multiplicás por 3 y le sumás 9, llegás a 54. ¿Qué número soy?", a: 15 },
+    { q: "Pensé un número, lo dupliqué, le resté 7 y me dio 19. ¿Qué número pensé?", a: 13 },
+    { q: "Tengo dos cifras iguales y soy múltiplo de 9. ¿Qué número soy?", a: 99 },
+    { q: "Si me multiplicás por mí mismo y después le sumás 5, llegás a 149. ¿Qué número soy?", a: 12 },
+    { q: "Soy un número primo menor que 30 y mis cifras suman 10. ¿Qué número soy?", a: 19 },
+    { q: "Una planta mide 3 cm el primer día y cada día crece el doble de lo que medía el día anterior. ¿Cuántos cm mide el día 6?", a: 96 },
+    { q: "Tres números consecutivos suman 63. ¿Cuál es el del medio?", a: 21 },
+    { q: "Soy el número más chico que se puede dividir exacto por 2, por 3, por 4 y por 5. ¿Qué número soy?", a: 60 },
+    { q: "Entre mi hermano y yo sumamos 25 años y yo le llevo 5 años. ¿Cuántos años tiene mi hermano?", a: 10 },
+    { q: "Tengo 4 bolsas con 15 caramelos cada una y reparto 23 caramelos. ¿Cuántos me quedan?", a: 37 }
   ];
   const MAX_TRIES = 3;
   function dayNumber() {
