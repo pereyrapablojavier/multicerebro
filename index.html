@@ -39,6 +39,9 @@
   button:active { transform: scale(.96); }
   button.secondary { background: #e9ecff; color: var(--primary); }
   button.ghost { background: transparent; color: var(--muted); font-weight: normal; text-decoration: underline; padding: 6px; }
+  button.back { background: var(--primary); color: #fff; padding: 10px 18px; min-height: 44px; border-radius: 999px;
+    font-weight: bold; box-shadow: 0 3px 8px rgba(67,97,238,.35); }
+  button.back.wide { width: 100%; margin-top: 16px; font-size: 1.05rem; }
   button:disabled { opacity: .45; cursor: not-allowed; }
   input[type=text], input[type=number] {
     font: inherit; padding: 12px; border-radius: 12px; border: 2px solid #d8dcf0; width: 100%;
@@ -154,8 +157,8 @@
   <!-- Pantalla 2: configurar partida -->
   <section id="screen-setup" class="card hidden">
     <div class="topbar">
+      <button class="back" data-back>⬅ Volver</button>
       <strong id="setup-name"></strong>
-      <button class="ghost" data-back>← Cambiar jugador</button>
     </div>
     <label>¿Qué tablas querés practicar?</label>
     <div class="row" style="margin-bottom:10px">
@@ -199,7 +202,7 @@
     <div class="row" style="margin-top:16px">
       <button class="secondary" id="btn-res-badges">🏆 Mi colección</button>
       <button id="btn-again">Jugar de nuevo</button>
-      <button class="secondary" data-back>Inicio</button>
+      <button class="secondary" data-back>🏠 Inicio</button>
     </div>
   </section>
 
@@ -208,20 +211,21 @@
   <!-- Pantalla 6: galería de insignias -->
   <section id="screen-badges" class="card hidden">
     <div class="topbar">
+      <button class="back" data-back>⬅ Volver</button>
       <strong>🏆 Mi colección</strong>
-      <button class="ghost" data-back>← Volver</button>
     </div>
     <p class="hint" style="text-align:left">Inspiradas en KATSEYE, el grupo global de HYBE × Geffen. App no oficial. ¡Ganalas jugando!</p>
     <select id="badge-player"></select>
     <p class="hint" id="badge-summary"></p>
     <div class="badge-grid" id="badge-grid"></div>
+    <button class="back wide" data-back>⬅ Volver al inicio</button>
   </section>
 
   <!-- Pantalla 5: reporte semanal -->
   <section id="screen-report" class="card hidden">
     <div class="topbar">
-      <strong>Puntos de la semana</strong>
-      <button class="ghost" data-back>← Volver</button>
+      <button class="back" data-back>⬅ Volver</button>
+      <strong>📊 Puntos de la semana</strong>
     </div>
     <p class="hint" id="report-range" style="text-align:left"></p>
     <div style="overflow-x:auto"><table id="report-table"></table></div>
@@ -232,6 +236,9 @@
     </div>
     <div style="text-align:center; margin-top:14px">
       <button class="ghost" id="btn-reset">Borrar todos los datos</button>
+    </div>
+    <div style="text-align:center">
+      <button class="back wide" data-back>⬅ Volver al inicio</button>
     </div>
   </section>
 </main>
