@@ -113,7 +113,7 @@
     <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
     <label for="riddle-player">¿Quién responde hoy?</label>
     <select id="riddle-player"></select>
-    <h2 class="daily-h">🧩 Acertijo del día <span class="badge">+5 puntos</span></h2>
+    <h2 class="daily-h">🧩 Acertijo del día <span class="badge">+2 puntos</span></h2>
     <p class="riddle-q" id="riddle-q"></p>
     <form id="riddle-form" class="answer-row" autocomplete="off">
       <input type="number" id="riddle-answer" inputmode="numeric" placeholder="?" required>
@@ -121,7 +121,7 @@
     </form>
     <div class="feedback" id="riddle-fb"></div>
     <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
-    <h2 class="daily-h">🔢 ¿Qué número soy? <span class="badge">+3 puntos</span></h2>
+    <h2 class="daily-h">🔢 ¿Qué número soy? <span class="badge">+1 punto</span></h2>
     <p class="riddle-q" id="adivi-q"></p>
     <form id="adivi-form" class="answer-row" autocomplete="off">
       <input type="number" id="adivi-answer" inputmode="numeric" placeholder="?" required>
@@ -527,7 +527,7 @@
       const off = v => { $a.disabled = v; $b.disabled = v; };
       if (!name) { off(true); $fb.className = 'feedback'; $fb.textContent = 'Agregá un jugador para poder responder 👆'; return; }
       const st = state(name);
-      if (st.ok) { off(true); $fb.className = 'feedback good'; $fb.textContent = '¡Ya lo resolviste hoy! +' + o.points + ' puntos ⭐'; return; }
+      if (st.ok) { off(true); $fb.className = 'feedback good'; $fb.textContent = '¡Ya lo resolviste hoy! +' + o.points + (o.points === 1 ? ' punto' : ' puntos') + ' ⭐'; return; }
       if (st.t >= MAX_TRIES) { off(true); $fb.className = 'feedback bad'; $fb.textContent = 'La respuesta era ' + o.item().a + '. ¡Mañana hay otra!'; return; }
       off(false);
       const left = MAX_TRIES - st.t;
@@ -552,8 +552,8 @@
     });
     return { render() { $q.textContent = o.item().q; update(); }, update };
   }
-  const riddleGame = dailyGame({ prefix: 'riddle', store: 'riddles', points: 5, item: () => ({ q: todayItem().q, a: todayItem().a }) });
-  const adiviGame = dailyGame({ prefix: 'adivi', store: 'adivi', points: 3, item: todayAdivi });
+  const riddleGame = dailyGame({ prefix: 'riddle', store: 'riddles', points: 2, item: () => ({ q: todayItem().q, a: todayItem().a }) });
+  const adiviGame = dailyGame({ prefix: 'adivi', store: 'adivi', points: 1, item: todayAdivi });
 
   function renderDaily() {
     const item = todayItem();
