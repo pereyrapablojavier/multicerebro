@@ -58,7 +58,7 @@
   .tables label:has(input:checked) { background: var(--primary); color: #fff; }
   .topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
   .score { background: var(--accent); color: #3a2a00; border-radius: 999px; padding: 6px 14px; font-weight: bold; }
-  .question { font-size: 3rem; text-align: center; margin: 18px 0; font-weight: bold; letter-spacing: 2px; }
+  .question { font-size: clamp(1.9rem, 9vw, 3rem); text-align: center; margin: 18px 0; font-weight: bold; letter-spacing: 2px; }
   .answer-row { display: flex; gap: 10px; }
   .answer-row input { font-size: 1.6rem; text-align: center; }
   .options { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; justify-content: center; }
@@ -138,7 +138,7 @@
     </div>
     <label>¿Qué tablas querés practicar?</label>
     <div class="row" style="margin-bottom:10px">
-      <button class="secondary" id="mode-all">⭐ TODAS<br><small>suman puntos</small></button>
+      <button class="secondary" id="mode-all">⭐ TODAS<br><small>desafío · suman puntos</small></button>
       <button class="secondary" id="mode-pick">🎯 Elegir tablas<br><small>práctica, sin puntos</small></button>
     </div>
     <div id="pick-box" class="hidden">
@@ -312,7 +312,7 @@
     $('mode-pick').style.outline = all ? 'none' : '3px solid var(--primary)';
     $('pick-box').classList.toggle('hidden', all);
     $('mode-hint').textContent = all
-      ? 'Sin ayuda = 3 puntos · Con las 5 opciones = 1 punto'
+      ? 'Desafío: sin las tablas del 1 y del 10, con números que faltan y cuentas combinadas. Sin ayuda = 3 puntos · Con las 5 opciones = 1 punto'
       : 'Modo práctica: en este modo NO se suman puntos. Para sumar, elegí TODAS.';
   }
   $('mode-all').onclick = () => setMode(true);
@@ -324,13 +324,17 @@
 
   // Mazo de operaciones sin repetir (3×4 y 4×3 cuentan como la misma).
   // Solo si se piden más preguntas que operaciones distintas, se vuelve a mezclar.
+  // Desafío (TODAS): sin el 1 ni el 10, que son demasiado fáciles.
+  const HARD = [2, 3, 4, 5, 6, 7, 8, 9, 11, 12];
+  const ALL = Array.from({ length: 12 }, (_, i) => i + 1);
   function buildDeck() {
+    const factors = cfg.scoring ? HARD : ALL;
     const seen = new Set(), deck = [];
     cfg.tables.forEach(a => {
-      for (let b = 1; b <= 12; b++) {
+      factors.forEach(b => {
         const key = Math.min(a, b) + 'x' + Math.max(a, b);
         if (!seen.has(key)) { seen.add(key); deck.push([a, b]); }
-      }
+      });
     });
     return shuffle(deck);
   }
@@ -344,12 +348,33 @@
     let [a, b] = game.deck.pop();
     if (rand(2)) [a, b] = [b, a]; // a veces se muestra al revés (4×3 en vez de 3×4)
     game.last = a + 'x' + b;
-    return { a, b, ans: a * b, usedOptions: false, answered: false };
+    const c = a * b;
+    const base = { usedOptions: false, answered: false };
+    const r = Math.random();
+    if (!cfg.scoring || r < 0.5) {
+      // Directa: a × b = ?
+      return { ...base, text: a + ' × ' + b + ' = ?', ans: c, reveal: a + ' × ' + b + ' = ' + c,
+        cands: [a * (b + 1), a * (b - 1), (a + 1) * b, (a - 1) * b, c + 10, c - 10, c + 1, c - 1, c + 2, c - 2] };
+    }
+    if (r < 0.8) {
+      // Factor que falta: a × ? = c   (o   ? × b = c)
+      const hideB = rand(2) === 0;
+      const ans = hideB ? b : a, other = hideB ? a : b;
+      return { ...base, text: hideB ? other + ' × ? = ' + c : '? × ' + other + ' = ' + c, ans,
+        reveal: a + ' × ' + b + ' = ' + c,
+        cands: [ans + 1, ans - 1, ans + 2, ans - 2, ans + 3, ans - 3, other, ans + 4] };
+    }
+    // Combinada: a × b + n
+    const n = 2 + rand(8);
+    const ans = c + n;
+    return { ...base, text: a + ' × ' + b + ' + ' + n + ' = ?', ans,
+      reveal: a + ' × ' + b + ' + ' + n + ' = ' + ans,
+      cands: [c, ans + 1, ans - 1, ans + 2, ans - 2, a * (b + 1) + n, a * (b - 1) + n, c - n, ans + 10] };
   }
 
   function startGame() {
     const tables = scoring
-      ? Array.from({ length: 12 }, (_, i) => i + 1)
+      ? HARD
       : [...tablesBox.querySelectorAll('input:checked')].map(i => +i.value);
     if (!tables.length) { alert('Elegí al menos una tabla'); return; }
     const n = Math.max(5, Math.min(50, +$('num-q').value || 10));
@@ -365,7 +390,7 @@
     game.q = newQuestion();
     $('progress').textContent = 'Pregunta ' + game.i + ' de ' + cfg.n;
     $('session-score').textContent = game.points;
-    $('question').textContent = game.q.a + ' × ' + game.q.b + ' = ?';
+    $('question').textContent = game.q.text;
     $('answer').value = '';
     $('options').innerHTML = '';
     setFeedback('', '');
@@ -384,9 +409,8 @@
     const q = game.q;
     q.usedOptions = true;
     const set = new Set([q.ans]);
-    // Distractores creíbles: resultados de tablas vecinas y números cercanos
-    const cands = shuffle([q.a * (q.b + 1), q.a * (q.b - 1), (q.a + 1) * q.b, (q.a - 1) * q.b,
-                           q.ans + 10, q.ans - 10, q.ans + 1, q.ans - 1, q.ans + 2, q.ans - 2]);
+    // Distractores creíbles, propios de cada tipo de pregunta
+    const cands = shuffle(q.cands.slice());
     for (const c of cands) { if (set.size >= count) break; if (c > 0) set.add(c); }
     let extra = 3; while (set.size < count) set.add(q.ans + (extra++));
     const box = $('options'); box.innerHTML = '';
@@ -423,7 +447,7 @@
         setFeedback('¡Correcto! 🎉 (práctica, sin puntos)', 'good');
       }
     } else {
-      setFeedback('Casi… ' + q.a + ' × ' + q.b + ' = ' + q.ans, 'bad');
+      setFeedback('Casi… ' + q.reveal, 'bad');
     }
     $('session-score').textContent = game.points;
     setTimeout(nextQuestion, value === q.ans ? 1100 : 2200);
