@@ -106,14 +106,16 @@
       <button class="ghost" data-back>← Cambiar jugador</button>
     </div>
     <label>¿Qué tablas querés practicar?</label>
-    <div id="tables" class="tables"></div>
-    <div class="row" style="margin-bottom:12px">
-      <button class="secondary" id="btn-all">Todas</button>
-      <button class="secondary" id="btn-none">Ninguna</button>
+    <div class="row" style="margin-bottom:10px">
+      <button class="secondary" id="mode-all">⭐ TODAS<br><small>suman puntos</small></button>
+      <button class="secondary" id="mode-pick">🎯 Elegir tablas<br><small>práctica, sin puntos</small></button>
+    </div>
+    <div id="pick-box" class="hidden">
+      <div id="tables" class="tables"></div>
     </div>
     <label for="num-q">Cantidad de preguntas</label>
     <input type="number" id="num-q" value="10" min="5" max="50">
-    <p class="hint">Sin ayuda = 3 puntos · Con opciones = 1 punto</p>
+    <p class="hint" id="mode-hint"></p>
     <button id="btn-start" style="width:100%; margin-top:8px; font-size:1.2rem">¡Empezar!</button>
   </section>
 
@@ -129,8 +131,7 @@
       <button type="submit" style="flex:0 0 auto">Responder</button>
     </form>
     <div class="help">
-      <button type="button" class="secondary" id="opt3">💡 3 opciones</button>
-      <button type="button" class="secondary" id="opt5">💡 5 opciones</button>
+      <button type="button" class="secondary" id="opt5">💡 Ver 5 opciones</button>
     </div>
     <div class="options" id="options"></div>
     <div class="feedback" id="feedback"></div>
@@ -261,34 +262,59 @@
   const tablesBox = $('tables');
   for (let i = 1; i <= 12; i++) {
     const l = document.createElement('label');
-    l.innerHTML = '<input type="checkbox" value="' + i + '"' + (i <= 10 && i >= 2 ? ' checked' : '') + '><span>' + i + '</span>';
+    l.innerHTML = '<input type="checkbox" value="' + i + '"' +  + '><span>' + i + '</span>';
     tablesBox.appendChild(l);
   }
-  const setAll = v => tablesBox.querySelectorAll('input').forEach(i => i.checked = v);
-  $('btn-all').onclick = () => setAll(true);
-  $('btn-none').onclick = () => setAll(false);
+  let scoring = true; // true = modo TODAS (suma puntos); false = práctica
+  function setMode(all) {
+    scoring = all;
+    $('mode-all').style.outline = all ? '3px solid var(--primary)' : 'none';
+    $('mode-pick').style.outline = all ? 'none' : '3px solid var(--primary)';
+    $('pick-box').classList.toggle('hidden', all);
+    $('mode-hint').textContent = all
+      ? 'Sin ayuda = 3 puntos · Con las 5 opciones = 1 punto'
+      : 'Modo práctica: en este modo NO se suman puntos. Para sumar, elegí TODAS.';
+  }
+  $('mode-all').onclick = () => setMode(true);
+  $('mode-pick').onclick = () => setMode(false);
+  setMode(true);
 
   /* ---------- Juego ---------- */
   let cfg = {}, game = null;
 
+  // Mazo de operaciones sin repetir (3×4 y 4×3 cuentan como la misma).
+  // Solo si se piden más preguntas que operaciones distintas, se vuelve a mezclar.
+  function buildDeck() {
+    const seen = new Set(), deck = [];
+    cfg.tables.forEach(a => {
+      for (let b = 1; b <= 12; b++) {
+        const key = Math.min(a, b) + 'x' + Math.max(a, b);
+        if (!seen.has(key)) { seen.add(key); deck.push([a, b]); }
+      }
+    });
+    return shuffle(deck);
+  }
   function newQuestion() {
-    // Evita repetir la misma pregunta dos veces seguidas
-    let a, b, tries = 0;
-    do {
-      a = cfg.tables[rand(cfg.tables.length)];
-      b = 1 + rand(12);
-      tries++;
-    } while (game.last === a + 'x' + b && tries < 20);
+    if (!game.deck.length) {
+      const last = game.last;
+      game.deck = buildDeck();
+      // evita que la primera de la nueva vuelta sea igual a la última jugada
+      if (game.deck.length > 1 && game.deck[game.deck.length - 1].join('x') === last) game.deck.unshift(game.deck.pop());
+    }
+    let [a, b] = game.deck.pop();
+    if (rand(2)) [a, b] = [b, a]; // a veces se muestra al revés (4×3 en vez de 3×4)
     game.last = a + 'x' + b;
     return { a, b, ans: a * b, usedOptions: false, answered: false };
   }
 
   function startGame() {
-    const tables = [...tablesBox.querySelectorAll('input:checked')].map(i => +i.value);
+    const tables = scoring
+      ? Array.from({ length: 12 }, (_, i) => i + 1)
+      : [...tablesBox.querySelectorAll('input:checked')].map(i => +i.value);
     if (!tables.length) { alert('Elegí al menos una tabla'); return; }
     const n = Math.max(5, Math.min(50, +$('num-q').value || 10));
-    cfg = { tables, n };
-    game = { i: 0, correct: 0, points: 0, last: '', q: null };
+    cfg = { tables, n, scoring };
+    game = { i: 0, correct: 0, points: 0, last: '', q: null, deck: [] };
     show('game');
     nextQuestion();
   }
@@ -310,7 +336,6 @@
   function setInputEnabled(on) {
     $('answer').disabled = !on;
     $('answer-form').querySelector('button').disabled = !on;
-    $('opt3').disabled = !on || game.q.usedOptions;
     $('opt5').disabled = !on || game.q.usedOptions;
   }
   function setFeedback(text, cls) { const f = $('feedback'); f.textContent = text; f.className = 'feedback ' + cls; }
@@ -331,9 +356,8 @@
       b.onclick = () => resolve(v);
       box.appendChild(b);
     });
-    $('opt3').disabled = true; $('opt5').disabled = true;
+    $('opt5').disabled = true;
   }
-  $('opt3').onclick = () => makeOptions(3);
   $('opt5').onclick = () => makeOptions(5);
 
   $('answer-form').addEventListener('submit', e => {
@@ -349,10 +373,15 @@
     setInputEnabled(false);
     document.querySelectorAll('#options button').forEach(b => b.disabled = true);
     if (value === q.ans) {
-      const pts = q.usedOptions ? 1 : 3;
-      game.points += pts; game.correct++;
-      addPoints(player, pts);
-      setFeedback('¡Correcto! +' + pts + (pts === 1 ? ' punto' : ' puntos') + ' 🎉', 'good');
+      game.correct++;
+      if (cfg.scoring) {
+        const pts = q.usedOptions ? 1 : 3;
+        game.points += pts;
+        addPoints(player, pts);
+        setFeedback('¡Correcto! +' + pts + (pts === 1 ? ' punto' : ' puntos') + ' 🎉', 'good');
+      } else {
+        setFeedback('¡Correcto! 🎉 (práctica, sin puntos)', 'good');
+      }
     } else {
       setFeedback('Casi… ' + q.a + ' × ' + q.b + ' = ' + q.ans, 'bad');
     }
@@ -365,7 +394,9 @@
     $('res-correct').textContent = game.correct;
     $('res-total').textContent = cfg.n;
     $('res-points').textContent = game.points;
-    $('res-week').textContent = 'Total de la semana: ' + weekTotal(player, mondayOf(new Date())) + ' puntos';
+    $('res-week').textContent = cfg.scoring
+      ? 'Total de la semana: ' + weekTotal(player, mondayOf(new Date())) + ' puntos'
+      : 'Fue práctica: no se sumaron puntos. Para sumar, jugá con TODAS.';
   }
 
   $('btn-start').onclick = startGame;
