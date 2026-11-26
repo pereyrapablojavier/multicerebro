@@ -74,6 +74,12 @@
   th:first-child, td:first-child { text-align: left; }
   td.total { font-weight: bold; color: var(--primary); }
   .today { background: #fff3c4; }
+  select { font: inherit; padding: 10px; border-radius: 12px; border: 2px solid #d8dcf0; width: 100%; margin-bottom: 10px; background: #fff; }
+  .story-title { margin: 4px 0 6px; color: var(--primary); }
+  .story-text { font-size: 1.1rem; line-height: 1.5; margin: 0 0 8px; }
+  .daily-h { margin: 0 0 6px; }
+  .riddle-q { font-size: 1.15rem; font-weight: bold; margin: 6px 0 12px; }
+  .badge { background: var(--accent); color: #3a2a00; border-radius: 999px; padding: 2px 10px; font-size: .85rem; vertical-align: middle; }
   .pop { animation: pop .35s; }
   @keyframes pop { 0% { transform: scale(.8); } 60% { transform: scale(1.12); } 100% { transform: scale(1); } }
 </style>
@@ -97,6 +103,23 @@
       <button id="btn-install" class="hidden" style="background:var(--good)">📲 Instalar en el celular</button>
       <p id="ios-help" class="hint hidden">Para instalarla: tocá el botón <strong>Compartir</strong> <span aria-hidden="true">⬆️</span> de Safari y elegí <strong>“Agregar a pantalla de inicio”</strong>.</p>
     </div>
+  </section>
+
+  <!-- Historia y acertijo del día (se muestran junto a la pantalla de inicio) -->
+  <section id="screen-daily" class="card">
+    <h2 class="daily-h">📖 Historia del día</h2>
+    <h3 class="story-title" id="story-title"></h3>
+    <p class="story-text" id="story-text"></p>
+    <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
+    <h2 class="daily-h">🧩 Acertijo del día <span class="badge">+5 puntos</span></h2>
+    <p class="riddle-q" id="riddle-q"></p>
+    <label for="riddle-player">¿Quién responde?</label>
+    <select id="riddle-player"></select>
+    <form id="riddle-form" class="answer-row" autocomplete="off">
+      <input type="number" id="riddle-answer" inputmode="numeric" placeholder="?" required>
+      <button type="submit" id="riddle-btn" style="flex:0 0 auto">Responder</button>
+    </form>
+    <div class="feedback" id="riddle-fb"></div>
   </section>
 
   <!-- Pantalla 2: configurar partida -->
@@ -174,7 +197,7 @@
 
   /* ---------- Almacenamiento: cookie local (con respaldo en localStorage) ---------- */
   const KEY = 'tablas_v1';
-  const emptyData = () => ({ players: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
+  const emptyData = () => ({ players: {}, riddles: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
 
   function readCookie() {
     const m = document.cookie.split('; ').find(c => c.startsWith(KEY + '='));
@@ -189,7 +212,9 @@
   function load() {
     let d = readCookie();
     if (!d) { try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) { d = null; } }
-    return d && d.players ? d : emptyData();
+    if (!d || !d.players) return emptyData();
+    d.riddles = d.riddles || {};
+    return d;
   }
   function save() {
     // Las cookies tienen tope de ~4 KB: guardamos solo los últimos 60 días por jugador en la cookie
@@ -198,7 +223,8 @@
   }
   function trimmed(d, days) {
     const limit = ymd(addDays(new Date(), -days));
-    const out = { players: {} };
+    const out = { players: {}, riddles: {} };
+    for (const [day, byName] of Object.entries(d.riddles || {})) if (day >= limit) out.riddles[day] = byName;
     for (const [name, byDay] of Object.entries(d.players)) {
       out.players[name] = {};
       for (const [day, pts] of Object.entries(byDay)) if (day >= limit) out.players[name][day] = pts;
@@ -229,7 +255,10 @@
   /* ---------- Utilidades de UI ---------- */
   const $ = id => document.getElementById(id);
   const screens = ['home', 'setup', 'game', 'result', 'report'];
-  function show(name) { screens.forEach(s => $('screen-' + s).classList.toggle('hidden', s !== name)); }
+  function show(name) {
+    screens.forEach(s => $('screen-' + s).classList.toggle('hidden', s !== name));
+    $('screen-daily').classList.toggle('hidden', name !== 'home');
+  }
   const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const rand = n => Math.floor(Math.random() * n);
   function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; }
@@ -246,6 +275,7 @@
       b.onclick = () => { player = n; $('setup-name').textContent = '¡Hola, ' + n + '!'; show('setup'); };
       box.appendChild(b);
     });
+    if (typeof renderDaily === 'function') renderDaily();
   }
   function addPlayer() {
     const name = $('new-name').value.trim();
@@ -432,6 +462,76 @@
       data = emptyData(); save(); renderReport(); renderPlayers();
     }
   };
+
+  /* ---------- Historia y acertijo del día ---------- */
+  // Cada día toca un par distinto (historia + acertijo que se resuelve con lo que leyeron).
+  const DAILY = [
+    { t: 'El truco de Gauss', s: 'Se cuenta que, de chico, Carl Gauss sumó los números del 1 al 10 en un instante. Juntó los extremos en parejas: 1+10, 2+9, 3+8, 4+7 y 5+6. ¡Todas las parejas dan 11!', q: 'Hay 5 parejas y cada una suma 11. ¿Cuánto es 5 × 11, o sea, 1+2+3+…+10?', a: 55 },
+    { t: 'Las abejas y sus patas', s: 'Las abejas son insectos, y todos los insectos tienen 6 patas. Cuando una abeja se posa en una flor, usa sus patitas para juntar el polen.', q: 'En una flor hay 7 abejas. ¿Cuántas patas hay en total?', a: 42 },
+    { t: 'El tablero de ajedrez', s: 'El tablero de ajedrez tiene 8 filas y en cada fila hay 8 casillas, alternando blancas y negras. Hace más de mil años que la gente juega en tableros como este.', q: '¿Cuántas casillas tiene un tablero de ajedrez? (8 × 8)', a: 64 },
+    { t: 'La araña tejedora', s: 'La araña no es un insecto: tiene 8 patas, no 6. Con ellas teje su tela, hilo por hilo, y la usa para atrapar moscas.', q: 'En el jardín hay 7 arañas. ¿Cuántas patas tienen entre todas?', a: 56 },
+    { t: 'Por qué la hora tiene 60 minutos', s: 'Hace mucho tiempo, en Babilonia, contaban de a 60. Por eso el reloj tiene 12 números y entre un número y el siguiente pasan 5 minutos.', q: 'El reloj tiene 12 números y entre cada uno pasan 5 minutos. ¿Cuántos minutos tarda en dar una vuelta completa?', a: 60 },
+    { t: 'El cubo que da vueltas', s: 'El cubo de Rubik tiene 6 caras, cada una de un color. En cada cara hay 3 filas de 3 cuadraditos, o sea 9 cuadraditos por cara.', q: '¿Cuántos cuadraditos de color tiene el cubo en total? (6 × 9)', a: 54 },
+    { t: 'El truco mágico del 9', s: 'Los resultados de la tabla del 9 guardan un secreto: sumá sus cifras y siempre te da 9. Mirá: 9 × 3 = 27 y 2 + 7 = 9. ¡Probalo con otros!', q: '¿Cuánto es 9 × 8? (Comprobá que sus cifras suman 9)', a: 72 },
+    { t: 'Contar con los dedos', s: 'Contamos de a 10 porque tenemos 10 dedos en las manos. Mucho antes de las calculadoras, la gente multiplicaba y sumaba usando los dedos.', q: 'En la plaza hay 7 amigos levantando las manos. ¿Cuántos dedos hay en total?', a: 70 },
+    { t: 'La docena', s: 'Una docena son 12 cosas. Se usa mucho para vender huevos, medialunas o empanadas. Por ejemplo, media docena son 6.', q: 'Mamá compró 4 docenas de empanadas. ¿Cuántas empanadas son?', a: 48 },
+    { t: 'La pizza compartida', s: 'Una pizza grande suele cortarse en 8 porciones. Si todos se llevan la misma cantidad, nadie se enoja y las cuentas son fáciles.', q: 'En una fiesta piden 5 pizzas. ¿Cuántas porciones hay en total?', a: 40 },
+    { t: 'El trébol de la suerte', s: 'Los tréboles casi siempre tienen 3 hojas, pero a veces aparece uno con 4 hojas. Dicen que quien encuentra uno tiene suerte, aunque es muy difícil de ver.', q: 'Encontraste 9 tréboles de 4 hojas. ¿Cuántas hojas hay en total?', a: 36 },
+    { t: 'Los dados', s: 'Un dado es un cubo y por eso tiene 6 caras. Cada cara tiene de 1 a 6 puntitos, y las caras opuestas siempre suman 7.', q: 'En una mesa hay 11 dados. ¿Cuántas caras hay en total?', a: 66 },
+    { t: 'El equipo de fútbol', s: 'Un equipo de fútbol juega con 11 jugadores en la cancha: 10 jugadores de campo y 1 arquero. ¡Hay que ponerse de acuerdo entre todos!', q: 'En un torneo juegan 9 equipos. ¿Cuántos jugadores hay en total, contando 11 por equipo?', a: 99 },
+    { t: 'El pulpo y sus brazos', s: 'El pulpo tiene 8 brazos llenos de ventosas, y con ellos puede agarrar cosas, caminar por el fondo del mar y hasta abrir frascos.', q: 'En el acuario hay 4 pulpos. ¿Cuántos brazos tienen entre todos?', a: 32 },
+    { t: 'La semana tiene 7 días', s: 'Lunes, martes, miércoles, jueves, viernes, sábado y domingo: la semana tiene 7 días. Los días de la semana se repiten una y otra vez, como una tabla de multiplicar.', q: 'Faltan 9 semanas para las vacaciones. ¿Cuántos días son?', a: 63 }
+  ];
+  const POINTS_RIDDLE = 5, MAX_TRIES = 3;
+  function todayItem() {
+    const n = new Date();
+    const day = Math.floor(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 86400000);
+    return DAILY[day % DAILY.length];
+  }
+  function riddleState(name) {
+    const d = data.riddles[ymd(new Date())];
+    return (d && d[name]) || { t: 0, ok: false };
+  }
+  function renderDaily() {
+    const item = todayItem();
+    $('story-title').textContent = item.t;
+    $('story-text').textContent = item.s;
+    $('riddle-q').textContent = item.q;
+    const sel = $('riddle-player'), prev = sel.value;
+    const names = Object.keys(data.players);
+    sel.innerHTML = names.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
+    if (names.includes(prev)) sel.value = prev;
+    updateRiddleUI();
+  }
+  function updateRiddleUI(wrong) {
+    const name = $('riddle-player').value, fb = $('riddle-fb');
+    const off = v => { $('riddle-answer').disabled = v; $('riddle-btn').disabled = v; };
+    if (!name) { off(true); fb.className = 'feedback'; fb.textContent = 'Agregá un jugador para poder responder 👆'; return; }
+    const st = riddleState(name);
+    if (st.ok) { off(true); fb.className = 'feedback good'; fb.textContent = '¡Ya lo resolviste hoy! +' + POINTS_RIDDLE + ' puntos ⭐'; return; }
+    if (st.t >= MAX_TRIES) { off(true); fb.className = 'feedback bad'; fb.textContent = 'La respuesta era ' + todayItem().a + '. ¡Mañana hay otro acertijo!'; return; }
+    off(false);
+    const left = MAX_TRIES - st.t;
+    fb.className = 'feedback' + (wrong ? ' bad' : '');
+    fb.textContent = (wrong ? 'Todavía no, ¡probá de nuevo! ' : '') + 'Te ' + (left === 1 ? 'queda 1 intento' : 'quedan ' + left + ' intentos') + '.';
+  }
+  $('riddle-player').onchange = () => { $('riddle-answer').value = ''; updateRiddleUI(); };
+  $('riddle-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('riddle-player').value;
+    if (!name || $('riddle-answer').value === '') return;
+    const st = riddleState(name);
+    if (st.ok || st.t >= MAX_TRIES) return;
+    st.t++;
+    const good = +$('riddle-answer').value === todayItem().a;
+    if (good) { st.ok = true; addPoints(name, POINTS_RIDDLE); }
+    const day = ymd(new Date());
+    data.riddles[day] = data.riddles[day] || {};
+    data.riddles[day][name] = st;
+    save();
+    $('riddle-answer').value = '';
+    updateRiddleUI(!good);
+  });
 
   /* ---------- Instalar como app (PWA) ---------- */
   if ('serviceWorker' in navigator) {
