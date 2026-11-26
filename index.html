@@ -747,7 +747,7 @@
       data.series[day][name] = st;
       save();
       $a.value = '';
-      render(ok ? '¡Correcto! +1 punto ⭐ ' : 'Era ' + list[st.i - 1].ans + '. ', ok ? 'good' : 'bad');
+      render(ok ? '¡Serie ' + st.i + ' correcta! +1 punto ⭐ ' : 'En la serie ' + st.i + ' la respuesta era ' + list[st.i - 1].ans + '. ', ok ? 'good' : 'bad');
     });
     return { render: () => render(), update: () => render() };
   })();
