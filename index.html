@@ -111,15 +111,23 @@
     <h3 class="story-title" id="story-title"></h3>
     <p class="story-text" id="story-text"></p>
     <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
+    <label for="riddle-player">¿Quién responde hoy?</label>
+    <select id="riddle-player"></select>
     <h2 class="daily-h">🧩 Acertijo del día <span class="badge">+5 puntos</span></h2>
     <p class="riddle-q" id="riddle-q"></p>
-    <label for="riddle-player">¿Quién responde?</label>
-    <select id="riddle-player"></select>
     <form id="riddle-form" class="answer-row" autocomplete="off">
       <input type="number" id="riddle-answer" inputmode="numeric" placeholder="?" required>
       <button type="submit" id="riddle-btn" style="flex:0 0 auto">Responder</button>
     </form>
     <div class="feedback" id="riddle-fb"></div>
+    <hr style="border:none; border-top:2px dashed #e3e6f7; margin:16px 0">
+    <h2 class="daily-h">🔢 ¿Qué número soy? <span class="badge">+3 puntos</span></h2>
+    <p class="riddle-q" id="adivi-q"></p>
+    <form id="adivi-form" class="answer-row" autocomplete="off">
+      <input type="number" id="adivi-answer" inputmode="numeric" placeholder="?" required>
+      <button type="submit" id="adivi-btn" style="flex:0 0 auto">Responder</button>
+    </form>
+    <div class="feedback" id="adivi-fb"></div>
   </section>
 
   <!-- Pantalla 2: configurar partida -->
@@ -197,7 +205,7 @@
 
   /* ---------- Almacenamiento: cookie local (con respaldo en localStorage) ---------- */
   const KEY = 'tablas_v1';
-  const emptyData = () => ({ players: {}, riddles: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
+  const emptyData = () => ({ players: {}, riddles: {}, adivi: {} }); // players[nombre] = { 'YYYY-MM-DD': puntos }
 
   function readCookie() {
     const m = document.cookie.split('; ').find(c => c.startsWith(KEY + '='));
@@ -214,6 +222,7 @@
     if (!d) { try { d = JSON.parse(localStorage.getItem(KEY)); } catch (e) { d = null; } }
     if (!d || !d.players) return emptyData();
     d.riddles = d.riddles || {};
+    d.adivi = d.adivi || {};
     return d;
   }
   function save() {
@@ -223,8 +232,9 @@
   }
   function trimmed(d, days) {
     const limit = ymd(addDays(new Date(), -days));
-    const out = { players: {}, riddles: {} };
-    for (const [day, byName] of Object.entries(d.riddles || {})) if (day >= limit) out.riddles[day] = byName;
+    const out = { players: {}, riddles: {}, adivi: {} };
+    for (const k of ['riddles', 'adivi'])
+      for (const [day, byName] of Object.entries(d[k] || {})) if (day >= limit) out[k][day] = byName;
     for (const [name, byDay] of Object.entries(d.players)) {
       out.players[name] = {};
       for (const [day, pts] of Object.entries(byDay)) if (day >= limit) out.players[name][day] = pts;
@@ -482,56 +492,84 @@
     { t: 'El pulpo y sus brazos', s: 'El pulpo tiene 8 brazos llenos de ventosas, y con ellos puede agarrar cosas, caminar por el fondo del mar y hasta abrir frascos.', q: 'En el acuario hay 4 pulpos. ¿Cuántos brazos tienen entre todos?', a: 32 },
     { t: 'La semana tiene 7 días', s: 'Lunes, martes, miércoles, jueves, viernes, sábado y domingo: la semana tiene 7 días. Los días de la semana se repiten una y otra vez, como una tabla de multiplicar.', q: 'Faltan 9 semanas para las vacaciones. ¿Cuántos días son?', a: 63 }
   ];
-  const POINTS_RIDDLE = 5, MAX_TRIES = 3;
-  function todayItem() {
+  // Adivinanzas "¿Qué número soy?" (una por día, distinta rotación que el acertijo)
+  const ADIVI = [
+    { q: 'Soy redondo como una pelota. Si me ponés a la derecha de otro número lo hago diez veces más grande, pero solo, no valgo nada. ¿Qué número soy?', a: 0 },
+    { q: 'Soy el primero de todos cuando se cuenta y el más chiquito de los que contás. ¿Qué número soy?', a: 1 },
+    { q: 'Estoy entre el uno y el tres. Si me sumás conmigo mismo, me convierto en cuatro. ¿Qué número soy?', a: 2 },
+    { q: 'Parezco dos ruedas, una arriba de la otra. Si me acostás, me parezco al signo del infinito. ¿Qué número soy?', a: 8 },
+    { q: 'Soy la cantidad de patas que tiene una hormiga. ¿Qué número soy?', a: 6 },
+    { q: 'Soy una docena: con mis cosas se cuentan los meses del año y los números del reloj. ¿Qué número soy?', a: 12 },
+    { q: 'Si me multiplicás por mí mismo, te doy 25. ¿Qué número soy?', a: 5 },
+    { q: 'Un gusano está en el fondo de un pozo de 12 metros. Cada día sube 4 metros y cada noche resbala 1. ¿En cuántos días logra salir?', a: 4 },
+    { q: 'Si me sumás 5, llegás a 20. ¿Qué número soy?', a: 15 },
+    { q: 'Soy el doble de 7. ¿Qué número soy?', a: 14 },
+    { q: 'Soy el resultado de 7 × 7. ¿Qué número soy?', a: 49 },
+    { q: 'Me escribo igual al derecho que al revés, y soy la cantidad de jugadores de un equipo de fútbol. ¿Qué número soy?', a: 11 },
+    { q: 'Soy un número par y estoy justo entre el 9 y el 11. ¿Qué número soy?', a: 10 },
+    { q: 'Soy el triple de 9. ¿Qué número soy?', a: 27 },
+    { q: 'Soy la mitad de 100. ¿Qué número soy?', a: 50 }
+  ];
+  const MAX_TRIES = 3;
+  function dayNumber() {
     const n = new Date();
-    const day = Math.floor(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 86400000);
-    return DAILY[day % DAILY.length];
+    return Math.floor(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate()) / 86400000);
   }
-  function riddleState(name) {
-    const d = data.riddles[ymd(new Date())];
-    return (d && d[name]) || { t: 0, ok: false };
+  const todayItem = () => DAILY[dayNumber() % DAILY.length];
+  const todayAdivi = () => ADIVI[(dayNumber() + 7) % ADIVI.length];
+
+  // Un "juego diario" (acertijo o adivinanza): comparte la misma mecánica, cambia el contenido y los puntos.
+  function dailyGame(o) {
+    const $q = $(o.prefix + '-q'), $a = $(o.prefix + '-answer'), $b = $(o.prefix + '-btn'), $fb = $(o.prefix + '-fb');
+    const state = name => { const d = data[o.store][ymd(new Date())]; return (d && d[name]) || { t: 0, ok: false }; };
+    function update(wrong) {
+      const name = $('riddle-player').value;
+      const off = v => { $a.disabled = v; $b.disabled = v; };
+      if (!name) { off(true); $fb.className = 'feedback'; $fb.textContent = 'Agregá un jugador para poder responder 👆'; return; }
+      const st = state(name);
+      if (st.ok) { off(true); $fb.className = 'feedback good'; $fb.textContent = '¡Ya lo resolviste hoy! +' + o.points + ' puntos ⭐'; return; }
+      if (st.t >= MAX_TRIES) { off(true); $fb.className = 'feedback bad'; $fb.textContent = 'La respuesta era ' + o.item().a + '. ¡Mañana hay otra!'; return; }
+      off(false);
+      const left = MAX_TRIES - st.t;
+      $fb.className = 'feedback' + (wrong ? ' bad' : '');
+      $fb.textContent = (wrong ? 'Todavía no, ¡probá de nuevo! ' : '') + 'Te ' + (left === 1 ? 'queda 1 intento' : 'quedan ' + left + ' intentos') + '.';
+    }
+    $(o.prefix + '-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const name = $('riddle-player').value;
+      if (!name || $a.value === '') return;
+      const st = state(name);
+      if (st.ok || st.t >= MAX_TRIES) return;
+      st.t++;
+      const good = +$a.value === o.item().a;
+      if (good) { st.ok = true; addPoints(name, o.points); }
+      const day = ymd(new Date());
+      data[o.store][day] = data[o.store][day] || {};
+      data[o.store][day][name] = st;
+      save();
+      $a.value = '';
+      update(!good);
+    });
+    return { render() { $q.textContent = o.item().q; update(); }, update };
   }
+  const riddleGame = dailyGame({ prefix: 'riddle', store: 'riddles', points: 5, item: () => ({ q: todayItem().q, a: todayItem().a }) });
+  const adiviGame = dailyGame({ prefix: 'adivi', store: 'adivi', points: 3, item: todayAdivi });
+
   function renderDaily() {
     const item = todayItem();
     $('story-title').textContent = item.t;
     $('story-text').textContent = item.s;
-    $('riddle-q').textContent = item.q;
     const sel = $('riddle-player'), prev = sel.value;
     const names = Object.keys(data.players);
     sel.innerHTML = names.map(n => '<option value="' + esc(n) + '">' + esc(n) + '</option>').join('');
     if (names.includes(prev)) sel.value = prev;
-    updateRiddleUI();
+    riddleGame.render();
+    adiviGame.render();
   }
-  function updateRiddleUI(wrong) {
-    const name = $('riddle-player').value, fb = $('riddle-fb');
-    const off = v => { $('riddle-answer').disabled = v; $('riddle-btn').disabled = v; };
-    if (!name) { off(true); fb.className = 'feedback'; fb.textContent = 'Agregá un jugador para poder responder 👆'; return; }
-    const st = riddleState(name);
-    if (st.ok) { off(true); fb.className = 'feedback good'; fb.textContent = '¡Ya lo resolviste hoy! +' + POINTS_RIDDLE + ' puntos ⭐'; return; }
-    if (st.t >= MAX_TRIES) { off(true); fb.className = 'feedback bad'; fb.textContent = 'La respuesta era ' + todayItem().a + '. ¡Mañana hay otro acertijo!'; return; }
-    off(false);
-    const left = MAX_TRIES - st.t;
-    fb.className = 'feedback' + (wrong ? ' bad' : '');
-    fb.textContent = (wrong ? 'Todavía no, ¡probá de nuevo! ' : '') + 'Te ' + (left === 1 ? 'queda 1 intento' : 'quedan ' + left + ' intentos') + '.';
-  }
-  $('riddle-player').onchange = () => { $('riddle-answer').value = ''; updateRiddleUI(); };
-  $('riddle-form').addEventListener('submit', e => {
-    e.preventDefault();
-    const name = $('riddle-player').value;
-    if (!name || $('riddle-answer').value === '') return;
-    const st = riddleState(name);
-    if (st.ok || st.t >= MAX_TRIES) return;
-    st.t++;
-    const good = +$('riddle-answer').value === todayItem().a;
-    if (good) { st.ok = true; addPoints(name, POINTS_RIDDLE); }
-    const day = ymd(new Date());
-    data.riddles[day] = data.riddles[day] || {};
-    data.riddles[day][name] = st;
-    save();
-    $('riddle-answer').value = '';
-    updateRiddleUI(!good);
-  });
+  $('riddle-player').onchange = () => {
+    $('riddle-answer').value = ''; $('adivi-answer').value = '';
+    riddleGame.update(); adiviGame.update();
+  };
 
   /* ---------- Instalar como app (PWA) ---------- */
   if ('serviceWorker' in navigator) {
